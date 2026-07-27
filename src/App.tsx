@@ -111,8 +111,6 @@ export default function App() {
   const [selectedRevs, setSelectedRevs] = useState<Set<number>>(new Set());
   const [settings, setSettings] = useState<AppSettings>({
     output_dir: "output",
-    tomcat_dir: "C:\\\\apache-tomcat-8.5\\\\webapps",
-    maven_path: "mvn",
     excludes: [],
   });
 
@@ -1393,20 +1391,6 @@ function SettingsModal({
             {outputDirError && (
               <p className="mt-1 text-[10px] text-red-500">{outputDirError}</p>
             )}
-          </FormField>
-          <FormField label="Tomcat 部署目录">
-            <input
-              value={form.tomcat_dir}
-              onChange={(e) => setForm({ ...form, tomcat_dir: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-            />
-          </FormField>
-          <FormField label="Maven 路径">
-            <input
-              value={form.maven_path}
-              onChange={(e) => setForm({ ...form, maven_path: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-            />
           </FormField>
           <FormField label="自动排除文件（每行一个）">
             <textarea

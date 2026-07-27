@@ -18,7 +18,5 @@ export interface CommitRecord {
 
 export interface Settings {
   output_dir: string;
-  tomcat_dir: string;
-  maven_path: string;
   excludes: string[];
 }

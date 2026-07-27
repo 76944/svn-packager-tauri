@@ -46,8 +46,6 @@ pub struct CommitRecord {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
     pub output_dir: String,
-    pub tomcat_dir: String,
-    pub maven_path: String,
     pub excludes: Vec<String>,
 }
 
@@ -55,8 +53,6 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             output_dir: "output".to_string(),
-            tomcat_dir: r"C:\apache-tomcat-8.5\webapps".to_string(),
-            maven_path: "mvn".to_string(),
             excludes: vec![
                 "license.xml".to_string(),
                 "web.xml".to_string(),
