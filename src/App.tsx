@@ -440,7 +440,7 @@ export default function App() {
           className="h-14 bg-slate-50 border-b border-slate-200 flex items-center justify-center cursor-default shrink-0 dark:bg-graphite-700 dark:border-graphite-500 tauri-drag-region"
         >
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-amber-500 flex items-center justify-center text-white font-bold text-xs">
+            <div className="w-7 h-7 rounded-lg bg-red-500 flex items-center justify-center text-white font-bold text-xs">
               SP
             </div>
             <div>
@@ -473,23 +473,23 @@ export default function App() {
                   }}
                   className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all ${
                     active
-                      ? "bg-brand-50 border-l-4 border-amber-500 dark:bg-amber-500/20"
+                      ? "bg-red-50 border-l-4 border-red-500 dark:bg-red-500/20"
                       : "hover:bg-slate-50 border-l-4 border-transparent dark:hover:bg-graphite-600/50"
                   }`}
                 >
                   <div
                     className={`w-7 h-7 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                      active ? "bg-amber-500 text-white" : "bg-slate-100 text-slate-500 dark:bg-graphite-700 dark:text-graphite-300"
+                      active ? "bg-red-500 text-white" : "bg-slate-100 text-slate-500 dark:bg-graphite-700 dark:text-graphite-300"
                     }`}
                   >
                     {p.name.substring(0, 2).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className={`text-xs font-medium truncate ${active ? "text-amber-500" : "text-slate-700 dark:text-graphite-100"}`}>
+                    <div className={`text-xs font-medium truncate ${active ? "text-red-500" : "text-slate-700 dark:text-graphite-100"}`}>
                       {p.name}
                     </div>
                     <div className="text-[10px] text-slate-400 font-mono truncate dark:text-graphite-400">
-                      {p.last_rev ? `r${p.last_rev}` : "未连接"}
+                      {p.last_rev && `r${p.last_rev}`}
                     </div>
                   </div>
                   <button
@@ -540,7 +540,7 @@ export default function App() {
           <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-graphite-400">
             <span className="font-mono uppercase tracking-wider">SVN Packager</span>
             <ChevronRight size={12} />
-            <span className="text-brand-600 font-medium">{currentProject?.name || "项目控制台"}</span>
+            <span className="text-red-600 font-medium">{currentProject?.name || "项目控制台"}</span>
             {view === "package" && (
               <>
                 <ChevronRight size={12} />
@@ -551,12 +551,12 @@ export default function App() {
           <div className="flex items-center gap-3">
             {currentProject && (
               <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-50 border border-slate-200 text-[10px] font-mono text-slate-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-300">
-                <FolderGit size={12} className="text-brand-500" />
+                <FolderGit size={12} className="text-red-500" />
                 {currentProject.svn_url}
               </div>
             )}
             {isPackaging && (
-              <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-amber-50 border border-amber-200 text-[10px] font-mono text-amber-600 max-w-xs dark:bg-amber-500/20 dark:border-amber-500/30">
+              <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-red-50 border border-red-200 text-[10px] font-mono text-red-600 max-w-xs dark:bg-red-500/20 dark:border-red-500/30">
                 <Loader2 size={12} className="animate-spin shrink-0" />
                 <span className="truncate">{progressMsg || "打包中..."}</span>
               </div>
@@ -602,7 +602,7 @@ export default function App() {
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden dark:bg-graphite-700 dark:border-graphite-500">
                 <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 dark:border-graphite-500">
                   <div className="flex items-center gap-2">
-                    <div className="w-1 h-4 bg-amber-500 rounded-full" />
+                    <div className="w-1 h-4 bg-red-500 rounded-full" />
                     <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider dark:text-graphite-100">
                       SVN Commit Log
                     </span>
@@ -619,14 +619,14 @@ export default function App() {
                       type="date"
                       value={dateStart}
                       onChange={(e) => setDateStart(e.target.value)}
-                      className="px-2.5 py-1.5 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-amber-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
+                      className="px-2.5 py-1.5 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
                     />
                     <span className="text-slate-400 text-xs">~</span>
                     <input
                       type="date"
                       value={dateEnd}
                       onChange={(e) => setDateEnd(e.target.value)}
-                      className="px-2.5 py-1.5 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-amber-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
+                      className="px-2.5 py-1.5 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
                     />
                   </div>
                   <button
@@ -645,7 +645,7 @@ export default function App() {
                       placeholder="搜索作者或提交说明..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-8 pr-3 py-1.5 w-56 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-amber-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
+                      className="pl-8 pr-3 py-1.5 w-56 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
                     />
                   </div>
                   <button
@@ -672,8 +672,8 @@ export default function App() {
                             onClick={toggleAll}
                             className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] transition-colors ${
                               selectedRevs.size === commitRecords.length && commitRecords.length > 0
-                                ? "bg-amber-500 border-amber-500 text-white"
-                                : "border-slate-300 hover:border-brand-400 dark:border-slate-500"
+                                ? "bg-red-500 border-red-500 text-white"
+                                : "border-slate-300 hover:border-red-400 dark:border-slate-500"
                             }`}
                           >
                             {selectedRevs.size === commitRecords.length && commitRecords.length > 0 && <CheckCircle2 size={10} />}
@@ -695,10 +695,10 @@ export default function App() {
                           <tr
                             key={record.revision}
                             onClick={() => toggleRev(record.revision)}
-                            className={`border-b border-slate-100 cursor-pointer transition-colors dark:border-graphite-500 ${isSelected ? "bg-brand-50/60 dark:bg-amber-500/20" : "hover:bg-slate-50 dark:hover:bg-graphite-600/50"}`}
+                            className={`border-b border-slate-100 cursor-pointer transition-colors dark:border-graphite-500 ${isSelected ? "bg-red-50/60 dark:bg-red-500/20" : "hover:bg-slate-50 dark:hover:bg-graphite-600/50"}`}
                           >
                             <td className="px-4 py-3">
-                              <div className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] transition-colors ${isSelected ? "bg-amber-500 border-amber-500 text-white" : "border-slate-300 dark:border-slate-500"}`}>
+                              <div className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] transition-colors ${isSelected ? "bg-red-500 border-red-500 text-white" : "border-slate-300 dark:border-slate-500"}`}>
                                 {isSelected && <CheckCircle2 size={10} />}
                               </div>
                             </td>
@@ -709,7 +709,7 @@ export default function App() {
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-[9px] font-bold text-white">
+                                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center text-[9px] font-bold text-white">
                                   {record.author.substring(0, 2).toUpperCase()}
                                 </div>
                                 <span className="text-xs text-slate-700 dark:text-graphite-100">{record.author}</span>
@@ -759,7 +759,7 @@ export default function App() {
                     >
                       <ArrowLeft size={12} /> 返回
                     </button>
-                    <div className="w-1 h-4 bg-amber-500 rounded-full" />
+                    <div className="w-1 h-4 bg-red-500 rounded-full" />
                     <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider dark:text-graphite-100">打包预览</span>
                     <span className="text-[10px] text-slate-400 font-mono dark:text-graphite-400">{filteredPackageFiles.length} / {packageFiles.length} 个文件</span>
                     <div className="flex-1" />
@@ -770,7 +770,7 @@ export default function App() {
                         placeholder="搜索文件名..."
                         value={packageSearchQuery}
                         onChange={(e) => setPackageSearchQuery(e.target.value)}
-                        className="pl-8 pr-3 py-1.5 w-48 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-amber-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
+                        className="pl-8 pr-3 py-1.5 w-48 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
                       />
                     </div>
                     <span className="text-[10px] text-slate-400 dark:text-graphite-400">双击文件查看变更详情</span>
@@ -803,7 +803,7 @@ export default function App() {
                             <tr
                               key={file.path}
                               onDoubleClick={() => handleFileDoubleClick(file.path)}
-                              className="border-b border-slate-100 cursor-pointer transition-colors dark:border-graphite-500 hover:bg-brand-50/40 dark:hover:bg-amber-500/20"
+                              className="border-b border-slate-100 cursor-pointer transition-colors dark:border-graphite-500 hover:bg-red-50/40 dark:hover:bg-red-500/20"
                               title="双击查看变更详情"
                             >
                               <td className="px-4 py-2.5 text-[11px] font-mono text-slate-400 dark:text-graphite-400">{idx + 1}</td>
@@ -860,7 +860,7 @@ export default function App() {
               <div className="shrink-0 border-t border-slate-200 bg-slate-50 dark:bg-graphite-700 dark:border-graphite-500">
                 <div className="flex items-center justify-between px-5 py-2 border-b border-slate-200 bg-white dark:bg-graphite-800 dark:border-graphite-500">
                   <div className="flex items-center gap-2">
-                    <div className="w-1 h-3.5 bg-amber-500 rounded-full" />
+                    <div className="w-1 h-3.5 bg-red-500 rounded-full" />
                     <Terminal size={12} className="text-slate-500" />
                     <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider dark:text-graphite-200">系统控制台</span>
                   </div>
@@ -895,7 +895,7 @@ export default function App() {
                             : log.startsWith("✗")
                             ? "text-red-600"
                             : log.includes("开始")
-                            ? "text-brand-600"
+                            ? "text-red-600"
                             : "text-slate-600 dark:text-graphite-200"
                         }`}
                       >
@@ -1087,7 +1087,7 @@ function DiffViewerModal({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 shrink-0 dark:border-graphite-500">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-1 h-5 bg-amber-500 rounded-full shrink-0" />
+            <div className="w-1 h-5 bg-red-500 rounded-full shrink-0" />
             <div className="min-w-0">
               <h3 className="text-sm font-semibold text-slate-800 truncate dark:text-slate-100">{fileName}</h3>
               <p className="text-[10px] text-slate-400 font-mono truncate dark:text-graphite-400" title={filePath}>{filePath}</p>
@@ -1119,7 +1119,7 @@ function DiffViewerModal({
           >
             {loading && (
               <div className="flex items-center justify-center h-full">
-                <Loader2 size={24} className="animate-spin text-brand-500" />
+                <Loader2 size={24} className="animate-spin text-red-500" />
                 <span className="ml-2 text-sm text-slate-500 dark:text-graphite-300">加载变更详情...</span>
               </div>
             )}
@@ -1307,7 +1307,7 @@ function ProjectModal({
       <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-[480px] max-w-[90vw] overflow-hidden dark:bg-graphite-700 dark:border-graphite-500">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-graphite-500">
           <div className="flex items-center gap-2">
-            <div className="w-1 h-5 bg-amber-500 rounded-full" />
+            <div className="w-1 h-5 bg-red-500 rounded-full" />
             <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{project ? "编辑项目" : "新增项目"}</h3>
           </div>
           <button onClick={onClose} className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 dark:hover:bg-graphite-500 dark:hover:text-slate-300">
@@ -1320,7 +1320,7 @@ function ProjectModal({
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               placeholder="例如：myapp-backend"
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-amber-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
             />
           </FormField>
           <FormField label="SVN 仓库地址" required>
@@ -1328,7 +1328,7 @@ function ProjectModal({
               value={form.svn_url}
               onChange={(e) => setForm({ ...form, svn_url: e.target.value })}
               placeholder="https://svn.company.com/repo/project"
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-amber-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
             />
           </FormField>
           <FormField label="本地项目路径" required>
@@ -1336,7 +1336,7 @@ function ProjectModal({
               value={form.local_path}
               onChange={(e) => setForm({ ...form, local_path: e.target.value })}
               placeholder="D:\\\\workspace\\\\myapp"
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-amber-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
             />
           </FormField>
           <div className="grid grid-cols-2 gap-3">
@@ -1345,7 +1345,7 @@ function ProjectModal({
                 value={form.username}
                 onChange={(e) => setForm({ ...form, username: e.target.value })}
                 placeholder="请输入用户名"
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-amber-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
               />
             </FormField>
             <FormField label="SVN 密码" required>
@@ -1354,7 +1354,7 @@ function ProjectModal({
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                 placeholder="请输入密码"
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-amber-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
               />
             </FormField>
           </div>
@@ -1362,7 +1362,7 @@ function ProjectModal({
         <div className="flex items-center justify-between gap-2 px-5 py-4 border-t border-slate-100 bg-slate-50/50 dark:bg-graphite-700/50 dark:border-graphite-500">
           <div className="flex items-center gap-2">
             {testStatus === "loading" && (
-              <span className="flex items-center gap-1 text-xs text-brand-600">
+              <span className="flex items-center gap-1 text-xs text-red-600">
                 <Loader2 size={12} className="animate-spin" /> 正在测试...
               </span>
             )}
@@ -1392,13 +1392,13 @@ function ProjectModal({
             <button
               onClick={testConnection}
               disabled={testStatus === "loading" || !form.svn_url.trim() || !form.username.trim() || !form.password.trim()}
-              className="px-4 py-2 rounded-lg border border-brand-200 bg-brand-50 text-xs font-medium text-amber-500 hover:bg-brand-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 rounded-lg border border-red-200 bg-red-50 text-xs font-medium text-red-500 hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               测试连接
             </button>
             <button
               onClick={() => onSave(form)}
-              className="px-4 py-2 rounded-lg bg-amber-500 text-white text-xs font-medium hover:bg-brand-700 transition-colors"
+              className="px-4 py-2 rounded-lg bg-red-500 text-white text-xs font-medium hover:bg-red-700 transition-colors"
             >
               保存项目
             </button>
@@ -1436,7 +1436,7 @@ function SettingsModal({
       <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-[440px] max-w-[90vw] overflow-hidden dark:bg-graphite-700 dark:border-graphite-500">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-graphite-500">
           <div className="flex items-center gap-2">
-            <div className="w-1 h-5 bg-amber-500 rounded-full" />
+            <div className="w-1 h-5 bg-red-500 rounded-full" />
             <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">系统设置</h3>
           </div>
           <button onClick={onClose} className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 dark:hover:bg-graphite-500 dark:hover:text-slate-300">
@@ -1452,7 +1452,7 @@ function SettingsModal({
                 setOutputDirError("");
               }}
               placeholder="例如：D:\\output"
-              className={`w-full px-3 py-2 rounded-lg border bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-amber-500 ${
+              className={`w-full px-3 py-2 rounded-lg border bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 ${
                 outputDirError ? "border-red-400" : "border-slate-200"
               } dark:bg-graphite-700 dark:text-graphite-100 dark:border-graphite-500`}
             />
@@ -1465,7 +1465,7 @@ function SettingsModal({
               rows={5}
               value={form.excludes.join("\n")}
               onChange={(e) => setForm({ ...form, excludes: e.target.value.split("\n").filter((s) => s.trim()) })}
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 font-mono focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-amber-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 font-mono focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
             />
           </FormField>
         </div>
@@ -1478,7 +1478,7 @@ function SettingsModal({
           </button>
           <button
             onClick={handleSave}
-            className="px-4 py-2 rounded-lg bg-amber-500 text-white text-xs font-medium hover:bg-brand-700 transition-colors"
+            className="px-4 py-2 rounded-lg bg-red-500 text-white text-xs font-medium hover:bg-red-700 transition-colors"
           >
             保存设置
           </button>
