@@ -14,7 +14,7 @@
     background-color: #f8fafc;
   }
   .dark body {
-    background-color: #0f172a;
+    background-color: #161618;
   }
 }
 
@@ -34,10 +34,10 @@
     background: #9ca3af;
   }
   .dark .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: #4b5563;
+    background: #4a4a46;
   }
   .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: #6b7280;
+    background: #6d6d68;
   }
   .tauri-drag-region {
     -webkit-app-region: drag;
@@ -63,10 +63,10 @@
   background: #9ca3af;
 }
 .dark ::-webkit-scrollbar-thumb {
-  background: #4b5563;
+  background: #4a4a46;
 }
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+  background: #6d6d68;
 }
 
 /* 日期选择器暗色配色 */

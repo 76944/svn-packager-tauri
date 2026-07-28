@@ -432,15 +432,15 @@ export default function App() {
   };
 
   return (
-    <div className={`flex h-screen bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 ${theme === "dark" ? "dark" : ""}`}>
+    <div className={`flex h-screen bg-slate-50 text-slate-800 dark:bg-graphite-800 dark:text-slate-100 ${theme === "dark" ? "dark" : ""}`}>
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 dark:bg-slate-800 dark:border-slate-700">
+      <aside className="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 dark:bg-graphite-700 dark:border-graphite-500">
         {/* Custom Titlebar for Sidebar */}
         <div
-          className="h-14 bg-slate-50 border-b border-slate-200 flex items-center justify-center cursor-default shrink-0 dark:bg-slate-800 dark:border-slate-700 tauri-drag-region"
+          className="h-14 bg-slate-50 border-b border-slate-200 flex items-center justify-center cursor-default shrink-0 dark:bg-graphite-700 dark:border-graphite-500 tauri-drag-region"
         >
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-brand-600 flex items-center justify-center text-white font-bold text-xs">
+            <div className="w-7 h-7 rounded-lg bg-amber-500 flex items-center justify-center text-white font-bold text-xs">
               SP
             </div>
             <div>
@@ -450,11 +450,11 @@ export default function App() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-3">
-          <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wider mb-2 px-2 dark:text-slate-500">
+          <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wider mb-2 px-2 dark:text-graphite-400">
             项目列表
           </div>
           {projects.length === 0 && (
-            <div className="px-2 py-6 text-center text-xs text-slate-400 dark:text-slate-500">
+            <div className="px-2 py-6 text-center text-xs text-slate-400 dark:text-graphite-400">
               暂无项目，点击新增
             </div>
           )}
@@ -473,28 +473,28 @@ export default function App() {
                   }}
                   className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all ${
                     active
-                      ? "bg-brand-50 border-l-4 border-brand-500 dark:bg-brand-500/20"
-                      : "hover:bg-slate-50 border-l-4 border-transparent dark:hover:bg-slate-700/50"
+                      ? "bg-brand-50 border-l-4 border-amber-500 dark:bg-amber-500/20"
+                      : "hover:bg-slate-50 border-l-4 border-transparent dark:hover:bg-graphite-600/50"
                   }`}
                 >
                   <div
                     className={`w-7 h-7 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                      active ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400"
+                      active ? "bg-amber-500 text-white" : "bg-slate-100 text-slate-500 dark:bg-graphite-700 dark:text-graphite-300"
                     }`}
                   >
                     {p.name.substring(0, 2).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className={`text-xs font-medium truncate ${active ? "text-brand-700" : "text-slate-700 dark:text-slate-200"}`}>
+                    <div className={`text-xs font-medium truncate ${active ? "text-amber-500" : "text-slate-700 dark:text-graphite-100"}`}>
                       {p.name}
                     </div>
-                    <div className="text-[10px] text-slate-400 font-mono truncate dark:text-slate-500">
+                    <div className="text-[10px] text-slate-400 font-mono truncate dark:text-graphite-400">
                       {p.last_rev ? `r${p.last_rev}` : "未连接"}
                     </div>
                   </div>
                   <button
                     onClick={(e) => { e.stopPropagation(); setEditingProject(p); setShowProjectModal(true); }}
-                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-opacity dark:hover:bg-slate-600 dark:hover:text-slate-200"
+                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-opacity dark:hover:bg-graphite-500 dark:hover:text-slate-200"
                   >
                     <Edit3 size={12} />
                   </button>
@@ -510,23 +510,23 @@ export default function App() {
           </div>
         </div>
 
-        <div className="p-3 border-t border-slate-100 flex gap-2 dark:border-slate-700">
+        <div className="p-3 border-t border-slate-100 flex gap-2 dark:border-graphite-500">
           <button
             onClick={() => { setEditingProject(null); setShowProjectModal(true); }}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-medium text-slate-600 transition-colors dark:bg-slate-700 dark:hover:bg-slate-600 dark:border-slate-600 dark:text-slate-300"
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-medium text-slate-600 transition-colors dark:bg-graphite-700 dark:hover:bg-graphite-500 dark:border-graphite-500 dark:text-graphite-200"
           >
             <Plus size={14} /> 新增项目
           </button>
           <button
             onClick={toggleTheme}
-            className="px-3 py-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 transition-colors dark:bg-slate-700 dark:hover:bg-slate-600 dark:border-slate-600 dark:text-slate-400"
+            className="px-3 py-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 transition-colors dark:bg-graphite-700 dark:hover:bg-graphite-500 dark:border-graphite-500 dark:text-graphite-300"
             title={theme === "dark" ? "切换到亮色模式" : "切换到暗色模式"}
           >
             {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
           </button>
           <button
             onClick={() => setShowSettingsModal(true)}
-            className="px-3 py-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 transition-colors dark:bg-slate-700 dark:hover:bg-slate-600 dark:border-slate-600 dark:text-slate-400"
+            className="px-3 py-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 transition-colors dark:bg-graphite-700 dark:hover:bg-graphite-500 dark:border-graphite-500 dark:text-graphite-300"
           >
             <Settings size={14} />
           </button>
@@ -536,21 +536,21 @@ export default function App() {
       {/* Main */}
       <main className="flex-1 flex flex-col min-w-0">
         {/* Custom Titlebar & Header */}
-        <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 dark:bg-slate-800 dark:border-slate-700 tauri-drag-region">
-          <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500">
+        <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 dark:bg-graphite-700 dark:border-graphite-500 tauri-drag-region">
+          <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-graphite-400">
             <span className="font-mono uppercase tracking-wider">SVN Packager</span>
             <ChevronRight size={12} />
             <span className="text-brand-600 font-medium">{currentProject?.name || "项目控制台"}</span>
             {view === "package" && (
               <>
                 <ChevronRight size={12} />
-                <span className="text-slate-600 font-medium dark:text-slate-300">打包预览</span>
+                <span className="text-slate-600 font-medium dark:text-graphite-200">打包预览</span>
               </>
             )}
           </div>
           <div className="flex items-center gap-3">
             {currentProject && (
-              <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-50 border border-slate-200 text-[10px] font-mono text-slate-500 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-400">
+              <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-50 border border-slate-200 text-[10px] font-mono text-slate-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-300">
                 <FolderGit size={12} className="text-brand-500" />
                 {currentProject.svn_url}
               </div>
@@ -565,21 +565,21 @@ export default function App() {
             <div className="flex items-center ml-4 tauri-no-drag">
               <button
                 onClick={handleMinimize}
-                className="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700 transition-colors"
+                className="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded dark:text-graphite-300 dark:hover:text-slate-200 dark:hover:bg-graphite-500 transition-colors"
                 title="最小化"
               >
                 <Minus size={14} />
               </button>
               <button
                 onClick={handleMaximize}
-                className="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700 transition-colors"
+                className="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded dark:text-graphite-300 dark:hover:text-slate-200 dark:hover:bg-graphite-500 transition-colors"
                 title="最大化"
               >
                 <Square size={12} />
               </button>
               <button
                 onClick={handleClose}
-                className="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-white hover:bg-red-500 rounded dark:text-slate-400 dark:hover:text-white dark:hover:bg-red-600 transition-colors"
+                className="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-white hover:bg-red-500 rounded dark:text-graphite-300 dark:hover:text-white dark:hover:bg-red-600 transition-colors"
                 title="关闭"
               >
                 <X size={14} />
@@ -591,42 +591,42 @@ export default function App() {
         {/* Content */}
         <div className="flex-1 overflow-hidden flex flex-col">
           {!currentProject ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 dark:text-graphite-400">
               <Package size={48} className="mb-4 text-slate-300 dark:text-slate-700" />
-              <h2 className="text-sm font-medium text-slate-600 mb-1 dark:text-slate-300">欢迎使用 SVN Packager</h2>
-              <p className="text-xs dark:text-slate-500">点击左侧"新增项目"按钮开始配置</p>
+              <h2 className="text-sm font-medium text-slate-600 mb-1 dark:text-graphite-200">欢迎使用 SVN Packager</h2>
+              <p className="text-xs dark:text-graphite-400">点击左侧"新增项目"按钮开始配置</p>
             </div>
           ) : view === "commits" ? (
             /* ===== Commits View ===== */
             <div className="flex-1 overflow-y-auto p-6 scrollbar-thin">
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden dark:bg-slate-800 dark:border-slate-700">
-                <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 dark:border-slate-700">
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden dark:bg-graphite-700 dark:border-graphite-500">
+                <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 dark:border-graphite-500">
                   <div className="flex items-center gap-2">
-                    <div className="w-1 h-4 bg-brand-500 rounded-full" />
-                    <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider dark:text-slate-200">
+                    <div className="w-1 h-4 bg-amber-500 rounded-full" />
+                    <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider dark:text-graphite-100">
                       SVN Commit Log
                     </span>
                   </div>
-                  <span className="text-[10px] text-slate-400 font-mono dark:text-slate-500">
+                  <span className="text-[10px] text-slate-400 font-mono dark:text-graphite-400">
                     {commitRecords.length > 0 ? `已获取 ${commitRecords.length} 条提交记录` : ""}
                   </span>
                 </div>
 
-                <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-100 bg-slate-50/50 dark:bg-slate-700/50 dark:border-slate-700">
+                <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-100 bg-slate-50/50 dark:bg-graphite-700/50 dark:border-graphite-500">
                   <div className="flex items-center gap-2">
                     <Calendar size={14} className="text-slate-400" />
                     <input
                       type="date"
                       value={dateStart}
                       onChange={(e) => setDateStart(e.target.value)}
-                      className="px-2.5 py-1.5 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
+                      className="px-2.5 py-1.5 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-amber-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
                     />
                     <span className="text-slate-400 text-xs">~</span>
                     <input
                       type="date"
                       value={dateEnd}
                       onChange={(e) => setDateEnd(e.target.value)}
-                      className="px-2.5 py-1.5 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
+                      className="px-2.5 py-1.5 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-amber-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
                     />
                   </div>
                   <button
@@ -645,7 +645,7 @@ export default function App() {
                       placeholder="搜索作者或提交说明..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-8 pr-3 py-1.5 w-56 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
+                      className="pl-8 pr-3 py-1.5 w-56 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-amber-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
                     />
                   </div>
                   <button
@@ -666,24 +666,24 @@ export default function App() {
                 <div className="overflow-auto max-h-[calc(100vh-256px)]">
                   <table className="w-full">
                     <thead className="sticky top-0 z-10">
-                      <tr className="bg-slate-50 border-b border-slate-200 dark:bg-slate-700 dark:border-slate-600">
+                      <tr className="bg-slate-50 border-b border-slate-200 dark:bg-graphite-700 dark:border-graphite-500">
                         <th className="px-4 py-2.5 text-left w-10">
                           <button
                             onClick={toggleAll}
                             className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] transition-colors ${
                               selectedRevs.size === commitRecords.length && commitRecords.length > 0
-                                ? "bg-brand-600 border-brand-600 text-white"
+                                ? "bg-amber-500 border-amber-500 text-white"
                                 : "border-slate-300 hover:border-brand-400 dark:border-slate-500"
                             }`}
                           >
                             {selectedRevs.size === commitRecords.length && commitRecords.length > 0 && <CheckCircle2 size={10} />}
                           </button>
                         </th>
-                        <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400">版本</th>
-                        <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400">作者</th>
-                        <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400">提交说明</th>
-                        <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400">日期</th>
-                        <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400">文件</th>
+                        <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider dark:text-graphite-300">版本</th>
+                        <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider dark:text-graphite-300">作者</th>
+                        <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider dark:text-graphite-300">提交说明</th>
+                        <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider dark:text-graphite-300">日期</th>
+                        <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider dark:text-graphite-300">文件</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -695,15 +695,15 @@ export default function App() {
                           <tr
                             key={record.revision}
                             onClick={() => toggleRev(record.revision)}
-                            className={`border-b border-slate-100 cursor-pointer transition-colors dark:border-slate-700 ${isSelected ? "bg-brand-50/60 dark:bg-brand-500/20" : "hover:bg-slate-50 dark:hover:bg-slate-700/50"}`}
+                            className={`border-b border-slate-100 cursor-pointer transition-colors dark:border-graphite-500 ${isSelected ? "bg-brand-50/60 dark:bg-amber-500/20" : "hover:bg-slate-50 dark:hover:bg-graphite-600/50"}`}
                           >
                             <td className="px-4 py-3">
-                              <div className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] transition-colors ${isSelected ? "bg-brand-600 border-brand-600 text-white" : "border-slate-300 dark:border-slate-500"}`}>
+                              <div className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] transition-colors ${isSelected ? "bg-amber-500 border-amber-500 text-white" : "border-slate-300 dark:border-slate-500"}`}>
                                 {isSelected && <CheckCircle2 size={10} />}
                               </div>
                             </td>
                             <td className="px-4 py-3">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[11px] font-mono font-bold dark:bg-slate-700 dark:text-slate-300">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[11px] font-mono font-bold dark:bg-graphite-700 dark:text-graphite-200">
                                 r{record.revision}
                               </span>
                             </td>
@@ -712,17 +712,17 @@ export default function App() {
                                 <div className="w-6 h-6 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-[9px] font-bold text-white">
                                   {record.author.substring(0, 2).toUpperCase()}
                                 </div>
-                                <span className="text-xs text-slate-700 dark:text-slate-200">{record.author}</span>
+                                <span className="text-xs text-slate-700 dark:text-graphite-100">{record.author}</span>
                               </div>
                             </td>
                             <td className="px-4 py-3">
-                              <span className="text-xs text-slate-600 truncate max-w-[240px] block dark:text-slate-300" title={record.message}>
+                              <span className="text-xs text-slate-600 truncate max-w-[240px] block dark:text-graphite-200" title={record.message}>
                                 {record.message}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-[11px] font-mono text-slate-400 dark:text-slate-500">{dateStr}</td>
+                            <td className="px-4 py-3 text-[11px] font-mono text-slate-400 dark:text-graphite-400">{dateStr}</td>
                             <td className="px-4 py-3">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-mono dark:bg-slate-700 dark:text-slate-400">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-mono dark:bg-graphite-700 dark:text-graphite-300">
                                 {record.changed_paths.length} files
                               </span>
                             </td>
@@ -732,15 +732,15 @@ export default function App() {
                     </tbody>
                   </table>
                   {filteredRecords.length === 0 && commitRecords.length > 0 && (
-                    <div className="flex flex-col items-center justify-center py-8 text-slate-400 dark:text-slate-500">
+                    <div className="flex flex-col items-center justify-center py-8 text-slate-400 dark:text-graphite-400">
                       <p className="text-xs">没有匹配的提交记录</p>
                     </div>
                   )}
                   {commitRecords.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-16 text-slate-400 dark:text-slate-500">
+                    <div className="flex flex-col items-center justify-center py-16 text-slate-400 dark:text-graphite-400">
                       <GitCommit size={32} className="mb-3 text-slate-300 dark:text-slate-700" />
-                      <p className="text-sm text-slate-500 mb-1 dark:text-slate-400">暂无提交记录</p>
-                      <p className="text-xs dark:text-slate-500">选择日期范围后点击"获取日志"</p>
+                      <p className="text-sm text-slate-500 mb-1 dark:text-graphite-300">暂无提交记录</p>
+                      <p className="text-xs dark:text-graphite-400">选择日期范围后点击"获取日志"</p>
                     </div>
                   )}
                 </div>
@@ -750,18 +750,18 @@ export default function App() {
             /* ===== Package Preview View ===== */
             <>
               <div className="flex-1 overflow-hidden p-6 min-h-0">
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden h-full flex flex-col dark:bg-slate-800 dark:border-slate-700">
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden h-full flex flex-col dark:bg-graphite-700 dark:border-graphite-500">
                   {/* Toolbar */}
-                  <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-100 shrink-0 dark:border-slate-700">
+                  <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-100 shrink-0 dark:border-graphite-500">
                     <button
                       onClick={() => setView("commits")}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-medium text-slate-600 transition-colors dark:bg-slate-700 dark:hover:bg-slate-600 dark:border-slate-600 dark:text-slate-300"
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-medium text-slate-600 transition-colors dark:bg-graphite-700 dark:hover:bg-graphite-500 dark:border-graphite-500 dark:text-graphite-200"
                     >
                       <ArrowLeft size={12} /> 返回
                     </button>
-                    <div className="w-1 h-4 bg-brand-500 rounded-full" />
-                    <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider dark:text-slate-200">打包预览</span>
-                    <span className="text-[10px] text-slate-400 font-mono dark:text-slate-500">{filteredPackageFiles.length} / {packageFiles.length} 个文件</span>
+                    <div className="w-1 h-4 bg-amber-500 rounded-full" />
+                    <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider dark:text-graphite-100">打包预览</span>
+                    <span className="text-[10px] text-slate-400 font-mono dark:text-graphite-400">{filteredPackageFiles.length} / {packageFiles.length} 个文件</span>
                     <div className="flex-1" />
                     <div className="relative">
                       <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -770,10 +770,10 @@ export default function App() {
                         placeholder="搜索文件名..."
                         value={packageSearchQuery}
                         onChange={(e) => setPackageSearchQuery(e.target.value)}
-                        className="pl-8 pr-3 py-1.5 w-48 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
+                        className="pl-8 pr-3 py-1.5 w-48 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-amber-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
                       />
                     </div>
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500">双击文件查看变更详情</span>
+                    <span className="text-[10px] text-slate-400 dark:text-graphite-400">双击文件查看变更详情</span>
                     <button
                       onClick={handlePackage}
                       disabled={isPackaging}
@@ -789,10 +789,10 @@ export default function App() {
                   <div className="flex-1 overflow-auto min-h-0">
                     <table className="w-full">
                       <thead className="sticky top-0 z-10">
-                        <tr className="bg-slate-50 border-b border-slate-200 dark:bg-slate-700 dark:border-slate-600">
-                          <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider w-10 dark:text-slate-400">#</th>
-                          <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400">文件路径</th>
-                          <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider w-40 dark:text-slate-400">版本</th>
+                        <tr className="bg-slate-50 border-b border-slate-200 dark:bg-graphite-700 dark:border-graphite-500">
+                          <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider w-10 dark:text-graphite-300">#</th>
+                          <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider dark:text-graphite-300">文件路径</th>
+                          <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider w-40 dark:text-graphite-300">版本</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -803,16 +803,16 @@ export default function App() {
                             <tr
                               key={file.path}
                               onDoubleClick={() => handleFileDoubleClick(file.path)}
-                              className="border-b border-slate-100 cursor-pointer transition-colors dark:border-slate-700 hover:bg-brand-50/40 dark:hover:bg-brand-500/20"
+                              className="border-b border-slate-100 cursor-pointer transition-colors dark:border-graphite-500 hover:bg-brand-50/40 dark:hover:bg-amber-500/20"
                               title="双击查看变更详情"
                             >
-                              <td className="px-4 py-2.5 text-[11px] font-mono text-slate-400 dark:text-slate-500">{idx + 1}</td>
+                              <td className="px-4 py-2.5 text-[11px] font-mono text-slate-400 dark:text-graphite-400">{idx + 1}</td>
                               <td className="px-4 py-2.5">
                                 <div className="flex items-center gap-2 min-w-0">
                                   {getFileIcon(file.path)}
                                   <div className="min-w-0">
-                                    <span className="text-xs font-medium text-slate-700 dark:text-slate-200">{fileName}</span>
-                                    <span className="text-[10px] text-slate-400 font-mono ml-1 truncate dark:text-slate-500">{dirPath}</span>
+                                    <span className="text-xs font-medium text-slate-700 dark:text-graphite-100">{fileName}</span>
+                                    <span className="text-[10px] text-slate-400 font-mono ml-1 truncate dark:text-graphite-400">{dirPath}</span>
                                   </div>
                                 </div>
                               </td>
@@ -825,7 +825,7 @@ export default function App() {
                                         e.stopPropagation();
                                         handleFileDoubleClick(file.path, rev);
                                       }}
-                                      className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-800 text-[10px] font-mono font-bold transition-colors cursor-pointer dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-300 dark:hover:text-white"
+                                      className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-800 text-[10px] font-mono font-bold transition-colors cursor-pointer dark:bg-graphite-700 dark:hover:bg-graphite-500 dark:text-graphite-200 dark:hover:text-white"
                                       title={`点击查看 r${rev} 的变更`}
                                     >
                                       r{rev}
@@ -839,17 +839,17 @@ export default function App() {
                       </tbody>
                     </table>
                     {packageFiles.length === 0 && (
-                      <div className="flex flex-col items-center justify-center py-16 text-slate-400 dark:text-slate-500">
+                      <div className="flex flex-col items-center justify-center py-16 text-slate-400 dark:text-graphite-400">
                         <Package size={32} className="mb-3 text-slate-300 dark:text-slate-700" />
-                        <p className="text-sm text-slate-500 mb-1 dark:text-slate-400">没有待打包文件</p>
-                        <p className="text-xs dark:text-slate-500">请返回选择提交记录</p>
+                        <p className="text-sm text-slate-500 mb-1 dark:text-graphite-300">没有待打包文件</p>
+                        <p className="text-xs dark:text-graphite-400">请返回选择提交记录</p>
                       </div>
                     )}
                     {packageFiles.length > 0 && filteredPackageFiles.length === 0 && (
-                      <div className="flex flex-col items-center justify-center py-16 text-slate-400 dark:text-slate-500">
+                      <div className="flex flex-col items-center justify-center py-16 text-slate-400 dark:text-graphite-400">
                         <Search size={32} className="mb-3 text-slate-300 dark:text-slate-700" />
-                        <p className="text-sm text-slate-500 mb-1 dark:text-slate-400">没有匹配的文件</p>
-                        <p className="text-xs dark:text-slate-500">请调整搜索关键词</p>
+                        <p className="text-sm text-slate-500 mb-1 dark:text-graphite-300">没有匹配的文件</p>
+                        <p className="text-xs dark:text-graphite-400">请调整搜索关键词</p>
                       </div>
                     )}
                   </div>
@@ -857,12 +857,12 @@ export default function App() {
               </div>
 
               {/* Console — fixed at bottom of interface */}
-              <div className="shrink-0 border-t border-slate-200 bg-slate-50 dark:bg-slate-800 dark:border-slate-700">
-                <div className="flex items-center justify-between px-5 py-2 border-b border-slate-200 bg-white dark:bg-slate-700 dark:border-slate-600">
+              <div className="shrink-0 border-t border-slate-200 bg-slate-50 dark:bg-graphite-700 dark:border-graphite-500">
+                <div className="flex items-center justify-between px-5 py-2 border-b border-slate-200 bg-white dark:bg-graphite-800 dark:border-graphite-500">
                   <div className="flex items-center gap-2">
-                    <div className="w-1 h-3.5 bg-brand-500 rounded-full" />
+                    <div className="w-1 h-3.5 bg-amber-500 rounded-full" />
                     <Terminal size={12} className="text-slate-500" />
-                    <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider dark:text-slate-300">系统控制台</span>
+                    <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider dark:text-graphite-200">系统控制台</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <button
@@ -884,7 +884,7 @@ export default function App() {
                   className="h-36 overflow-auto px-5 py-2.5 font-mono text-[11px] leading-relaxed space-y-0.5"
                 >
                   {consoleLogs.length === 0 ? (
-                    <span className="text-slate-400 italic dark:text-slate-500">等待打包...</span>
+                    <span className="text-slate-400 italic dark:text-graphite-400">等待打包...</span>
                   ) : (
                     consoleLogs.map((log, idx) => (
                       <div
@@ -896,7 +896,7 @@ export default function App() {
                             ? "text-red-600"
                             : log.includes("开始")
                             ? "text-brand-600"
-                            : "text-slate-600 dark:text-slate-300"
+                            : "text-slate-600 dark:text-graphite-200"
                         }`}
                       >
                         {log}
@@ -941,7 +941,7 @@ export default function App() {
 
       {/* Floating Notification Toast */}
       {notification && (
-        <div className="fixed top-4 right-4 z-[60] flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg border text-xs font-medium bg-white/95 backdrop-blur-sm dark:bg-slate-800/95 dark:border-slate-600">
+        <div className="fixed top-4 right-4 z-[60] flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg border text-xs font-medium bg-white/95 backdrop-blur-sm dark:bg-graphite-700/95 dark:border-graphite-500">
           <span
             className={`w-1.5 h-1.5 rounded-full ${
               notification.type === "success" ? "bg-green-500" : "bg-red-500"
@@ -952,7 +952,7 @@ export default function App() {
           </span>
           <button
             onClick={() => setNotification(null)}
-            className="ml-1 p-0.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors dark:hover:bg-slate-700 dark:hover:text-slate-300"
+            className="ml-1 p-0.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors dark:hover:bg-graphite-500 dark:hover:text-slate-300"
           >
             <X size={12} />
           </button>
@@ -1083,26 +1083,26 @@ function DiffViewerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-[90vw] max-w-[1200px] h-[85vh] flex flex-col overflow-hidden dark:bg-slate-800 dark:border-slate-700">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-[90vw] max-w-[1200px] h-[85vh] flex flex-col overflow-hidden dark:bg-graphite-700 dark:border-graphite-500">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 shrink-0 dark:border-slate-700">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 shrink-0 dark:border-graphite-500">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-1 h-5 bg-brand-500 rounded-full shrink-0" />
+            <div className="w-1 h-5 bg-amber-500 rounded-full shrink-0" />
             <div className="min-w-0">
               <h3 className="text-sm font-semibold text-slate-800 truncate dark:text-slate-100">{fileName}</h3>
-              <p className="text-[10px] text-slate-400 font-mono truncate dark:text-slate-500" title={filePath}>{filePath}</p>
+              <p className="text-[10px] text-slate-400 font-mono truncate dark:text-graphite-400" title={filePath}>{filePath}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {diffText && (
               <button
                 onClick={() => navigator.clipboard.writeText(diffText)}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs text-slate-600 transition-colors dark:bg-slate-700 dark:hover:bg-slate-600 dark:border-slate-600 dark:text-slate-300"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs text-slate-600 transition-colors dark:bg-graphite-700 dark:hover:bg-graphite-500 dark:border-graphite-500 dark:text-graphite-200"
               >
                 <Copy size={12} /> 复制全部
               </button>
             )}
-            <button onClick={onClose} className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-300">
+            <button onClick={onClose} className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 dark:hover:bg-graphite-500 dark:hover:text-slate-300">
               <X size={16} />
             </button>
           </div>
@@ -1114,13 +1114,13 @@ function DiffViewerModal({
           <div
             ref={scrollRef}
             onScroll={handleScroll}
-            className="absolute inset-0 overflow-auto bg-slate-50 [&::-webkit-scrollbar]:hidden dark:bg-slate-900"
+            className="absolute inset-0 overflow-auto bg-slate-50 [&::-webkit-scrollbar]:hidden dark:bg-graphite-700"
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
           >
             {loading && (
               <div className="flex items-center justify-center h-full">
                 <Loader2 size={24} className="animate-spin text-brand-500" />
-                <span className="ml-2 text-sm text-slate-500 dark:text-slate-400">加载变更详情...</span>
+                <span className="ml-2 text-sm text-slate-500 dark:text-graphite-300">加载变更详情...</span>
               </div>
             )}
             {error && (
@@ -1133,7 +1133,7 @@ function DiffViewerModal({
             )}
             {diffText && hunks.length === 0 && !loading && !error && (
               <div className="flex items-center justify-center h-full">
-                <p className="text-sm text-slate-400 dark:text-slate-500">没有文本变更（可能是二进制文件）</p>
+                <p className="text-sm text-slate-400 dark:text-graphite-400">没有文本变更（可能是二进制文件）</p>
               </div>
             )}
             {hunks.length > 0 && (
@@ -1155,17 +1155,17 @@ function DiffViewerModal({
                             }`}
                           >
                         {/* Old line number */}
-                        <div className="shrink-0 w-12 text-right pr-2 py-0.5 text-slate-300 select-none border-r border-slate-100 dark:text-slate-600 dark:border-slate-700">
+                        <div className="shrink-0 w-12 text-right pr-2 py-0.5 text-slate-300 select-none border-r border-slate-100 dark:text-graphite-300 dark:border-graphite-500">
                           {line.oldNum ?? ""}
                         </div>
                         {/* New line number */}
-                        <div className="shrink-0 w-12 text-right pr-2 py-0.5 text-slate-300 select-none border-r border-slate-100 dark:text-slate-600 dark:border-slate-700">
+                        <div className="shrink-0 w-12 text-right pr-2 py-0.5 text-slate-300 select-none border-r border-slate-100 dark:text-graphite-300 dark:border-graphite-500">
                           {line.newNum ?? ""}
                         </div>
                         {/* Symbol */}
                         <div
                           className={`shrink-0 w-5 text-center py-0.5 select-none ${
-                            line.type === "add" ? "text-green-600" : line.type === "remove" ? "text-red-600" : "text-slate-300 dark:text-slate-600"
+                            line.type === "add" ? "text-green-600" : line.type === "remove" ? "text-red-600" : "text-slate-300 dark:text-graphite-300"
                           }`}
                         >
                           {line.type === "add" ? "+" : line.type === "remove" ? "-" : " "}
@@ -1178,7 +1178,7 @@ function DiffViewerModal({
                                 ? "text-green-800 dark:text-green-400"
                                 : line.type === "remove"
                                 ? "text-red-800 dark:text-red-400"
-                                : "text-slate-600 dark:text-slate-300"
+                                : "text-slate-600 dark:text-graphite-200"
                             }
                           >
                             {line.content || " "}
@@ -1207,11 +1207,11 @@ function DiffViewerModal({
               title="拖拽或点击跳转"
             >
               {/* Background track */}
-              <div className="absolute inset-0 bg-slate-100/80 border-l border-slate-200 dark:bg-slate-700/80 dark:border-slate-600" />
+              <div className="absolute inset-0 bg-slate-100/80 border-l border-slate-200 dark:bg-graphite-700/80 dark:border-graphite-500" />
 
               {/* Viewport indicator (draggable handle) */}
               <div
-                className="absolute left-0.5 right-0.5 bg-slate-300/70 rounded-sm border border-slate-400/30 hover:bg-slate-400/70 transition-colors dark:bg-slate-500/70 dark:border-slate-400/30 dark:hover:bg-slate-400/70"
+                className="absolute left-0.5 right-0.5 bg-slate-300/70 rounded-sm border border-slate-400/30 hover:bg-slate-400/70 transition-colors dark:bg-slate-500/70 dark:border-slate-400/30 dark:hover:bg-graphite-500/70"
                 style={{
                   top: `${viewportTop}%`,
                   height: `${Math.max(viewportHeight, 3)}%`,
@@ -1250,7 +1250,7 @@ function DiffViewerModal({
 
         {/* Footer legend */}
         {totalLines > 0 && !loading && !error && (
-          <div className="shrink-0 flex items-center justify-end gap-4 px-5 py-2 border-t border-slate-100 bg-white text-[10px] text-slate-400 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-500">
+          <div className="shrink-0 flex items-center justify-end gap-4 px-5 py-2 border-t border-slate-100 bg-white text-[10px] text-slate-400 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-400">
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-sm bg-green-500" /> 新增
             </span>
@@ -1304,13 +1304,13 @@ function ProjectModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-[480px] max-w-[90vw] overflow-hidden dark:bg-slate-800 dark:border-slate-700">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-700">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-[480px] max-w-[90vw] overflow-hidden dark:bg-graphite-700 dark:border-graphite-500">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-graphite-500">
           <div className="flex items-center gap-2">
-            <div className="w-1 h-5 bg-brand-500 rounded-full" />
+            <div className="w-1 h-5 bg-amber-500 rounded-full" />
             <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{project ? "编辑项目" : "新增项目"}</h3>
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-300">
+          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 dark:hover:bg-graphite-500 dark:hover:text-slate-300">
             <X size={16} />
           </button>
         </div>
@@ -1320,7 +1320,7 @@ function ProjectModal({
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               placeholder="例如：myapp-backend"
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-amber-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
             />
           </FormField>
           <FormField label="SVN 仓库地址" required>
@@ -1328,7 +1328,7 @@ function ProjectModal({
               value={form.svn_url}
               onChange={(e) => setForm({ ...form, svn_url: e.target.value })}
               placeholder="https://svn.company.com/repo/project"
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-amber-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
             />
           </FormField>
           <FormField label="本地项目路径" required>
@@ -1336,7 +1336,7 @@ function ProjectModal({
               value={form.local_path}
               onChange={(e) => setForm({ ...form, local_path: e.target.value })}
               placeholder="D:\\\\workspace\\\\myapp"
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-amber-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
             />
           </FormField>
           <div className="grid grid-cols-2 gap-3">
@@ -1345,7 +1345,7 @@ function ProjectModal({
                 value={form.username}
                 onChange={(e) => setForm({ ...form, username: e.target.value })}
                 placeholder="请输入用户名"
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-amber-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
               />
             </FormField>
             <FormField label="SVN 密码" required>
@@ -1354,12 +1354,12 @@ function ProjectModal({
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                 placeholder="请输入密码"
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-amber-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
               />
             </FormField>
           </div>
         </div>
-        <div className="flex items-center justify-between gap-2 px-5 py-4 border-t border-slate-100 bg-slate-50/50 dark:bg-slate-700/50 dark:border-slate-700">
+        <div className="flex items-center justify-between gap-2 px-5 py-4 border-t border-slate-100 bg-slate-50/50 dark:bg-graphite-700/50 dark:border-graphite-500">
           <div className="flex items-center gap-2">
             {testStatus === "loading" && (
               <span className="flex items-center gap-1 text-xs text-brand-600">
@@ -1385,20 +1385,20 @@ function ProjectModal({
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600"
+              className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-200 dark:hover:bg-graphite-500"
             >
               取消
             </button>
             <button
               onClick={testConnection}
               disabled={testStatus === "loading" || !form.svn_url.trim() || !form.username.trim() || !form.password.trim()}
-              className="px-4 py-2 rounded-lg border border-brand-200 bg-brand-50 text-xs font-medium text-brand-700 hover:bg-brand-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 rounded-lg border border-brand-200 bg-brand-50 text-xs font-medium text-amber-500 hover:bg-brand-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               测试连接
             </button>
             <button
               onClick={() => onSave(form)}
-              className="px-4 py-2 rounded-lg bg-brand-600 text-white text-xs font-medium hover:bg-brand-700 transition-colors"
+              className="px-4 py-2 rounded-lg bg-amber-500 text-white text-xs font-medium hover:bg-brand-700 transition-colors"
             >
               保存项目
             </button>
@@ -1433,13 +1433,13 @@ function SettingsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-[440px] max-w-[90vw] overflow-hidden dark:bg-slate-800 dark:border-slate-700">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-700">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-[440px] max-w-[90vw] overflow-hidden dark:bg-graphite-700 dark:border-graphite-500">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-graphite-500">
           <div className="flex items-center gap-2">
-            <div className="w-1 h-5 bg-brand-500 rounded-full" />
+            <div className="w-1 h-5 bg-amber-500 rounded-full" />
             <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">系统设置</h3>
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-300">
+          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 dark:hover:bg-graphite-500 dark:hover:text-slate-300">
             <X size={16} />
           </button>
         </div>
@@ -1452,9 +1452,9 @@ function SettingsModal({
                 setOutputDirError("");
               }}
               placeholder="例如：D:\\output"
-              className={`w-full px-3 py-2 rounded-lg border bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 ${
+              className={`w-full px-3 py-2 rounded-lg border bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-amber-500 ${
                 outputDirError ? "border-red-400" : "border-slate-200"
-              } dark:bg-slate-700 dark:text-slate-200 dark:border-slate-600`}
+              } dark:bg-graphite-700 dark:text-graphite-100 dark:border-graphite-500`}
             />
             {outputDirError && (
               <p className="mt-1 text-[10px] text-red-500 dark:text-red-400">{outputDirError}</p>
@@ -1465,20 +1465,20 @@ function SettingsModal({
               rows={5}
               value={form.excludes.join("\n")}
               onChange={(e) => setForm({ ...form, excludes: e.target.value.split("\n").filter((s) => s.trim()) })}
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 font-mono focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 font-mono focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-amber-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
             />
           </FormField>
         </div>
-        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-100 bg-slate-50/50 dark:bg-slate-700/50 dark:border-slate-700">
+        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-100 bg-slate-50/50 dark:bg-graphite-700/50 dark:border-graphite-500">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600"
+            className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-200 dark:hover:bg-graphite-500"
           >
             取消
           </button>
           <button
             onClick={handleSave}
-            className="px-4 py-2 rounded-lg bg-brand-600 text-white text-xs font-medium hover:bg-brand-700 transition-colors"
+            className="px-4 py-2 rounded-lg bg-amber-500 text-white text-xs font-medium hover:bg-brand-700 transition-colors"
           >
             保存设置
           </button>
@@ -1493,7 +1493,7 @@ function SettingsModal({
 function FormField({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 dark:text-slate-400">
+      <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 dark:text-graphite-300">
         {label}{required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
       {children}
