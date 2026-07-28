@@ -19,4 +19,5 @@ export interface CommitRecord {
 export interface Settings {
   output_dir: string;
   excludes: string[];
+  sensitive_files: string[];
 }

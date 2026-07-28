@@ -47,6 +47,8 @@ pub struct CommitRecord {
 pub struct Settings {
     pub output_dir: String,
     pub excludes: Vec<String>,
+    #[serde(default)]
+    pub sensitive_files: Vec<String>,
 }
 
 impl Default for Settings {
@@ -64,6 +66,13 @@ impl Default for Settings {
                 "wechat-config.properties".to_string(),
                 "whitelist.xml".to_string(),
                 "sn.txt".to_string(),
+            ],
+            sensitive_files: vec![
+                "db.txt".to_string(),
+                "1jw_DDL.sql".to_string(),
+                "2view-scrpts.sql".to_string(),
+                "5jw_DML.sql".to_string(),
+                "6config.txt".to_string(),
             ],
         }
     }
@@ -124,10 +133,14 @@ impl ConfigManager {
         if !path.exists() {
             return Settings::default();
         }
-        fs::read_to_string(&path)
+        let mut s: Settings = fs::read_to_string(&path)
             .ok()
             .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default()
+            .unwrap_or_default();
+        if s.sensitive_files.is_empty() {
+            s.sensitive_files = Settings::default().sensitive_files;
+        }
+        s
     }
 
     fn save_settings(settings: &Settings) {

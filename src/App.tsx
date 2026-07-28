@@ -119,10 +119,12 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings>({
     output_dir: "output",
     excludes: [],
+    sensitive_files: [],
   });
 
   const [isPackaging, setIsPackaging] = useState(false);
-  const [progressMsg, setProgressMsg] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
   const consoleRef = useRef<HTMLDivElement>(null);
@@ -142,7 +144,7 @@ export default function App() {
   // Listen for packaging progress
   useEffect(() => {
     const unlisten = listen<string>("package_progress", (event) => {
-      setProgressMsg(event.payload);
+      if (event.payload.startsWith("处理变更文件:")) return;
       setConsoleLogs((prev) => [...prev, event.payload]);
     });
     return () => { unlisten.then((f) => f()); };
@@ -213,6 +215,8 @@ export default function App() {
   }
 
   async function handleSaveProject(project: SvnProject) {
+    if (isSaving) return;
+    setIsSaving(true);
     try {
       if (!project.name.trim() || !project.svn_url.trim() || !project.local_path.trim() || !project.username.trim() || !project.password.trim()) {
         setNotification({ type: "error", message: "请填写所有必填项" });
@@ -236,6 +240,8 @@ export default function App() {
       setEditingProject(null);
     } catch (e) {
       setNotification({ type: "error", message: `保存项目失败: ${e}` });
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -255,6 +261,8 @@ export default function App() {
   }
 
   async function handleSaveSettings(newSettings: AppSettings) {
+    if (isSaving) return;
+    setIsSaving(true);
     try {
       await invoke("save_settings", { settings: newSettings });
       setSettings(newSettings);
@@ -262,6 +270,8 @@ export default function App() {
       setShowSettingsModal(false);
     } catch (e) {
       setNotification({ type: "error", message: `保存设置失败: ${e}` });
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -288,12 +298,12 @@ export default function App() {
     }
 
     setIsPackaging(true);
-    setProgressMsg("开始增量打包...");
     setConsoleLogs((prev) => [...prev, "开始增量打包..."]);
     try {
       const changedFiles = commitRecords
         .filter((r) => selectedRevs.has(r.revision))
         .flatMap((r) => r.changed_paths);
+
       const result = await invoke<string>("package_incremental", {
         projectPath: currentProject.local_path,
         outputDir: settings.output_dir,
@@ -301,11 +311,25 @@ export default function App() {
         changedFiles,
       });
       setConsoleLogs((prev) => [...prev, `✓ 打包完成: ${result}`]);
+
+      const SENSITIVE_FILES = settings.sensitive_files;
+      const foundSensitive = new Set<string>();
+      for (const fp of changedFiles) {
+        const basename = fp.split("/").pop() ?? fp;
+        if (SENSITIVE_FILES.some((sf) => basename === sf || basename.endsWith(sf))) {
+          foundSensitive.add(basename);
+        }
+      }
+      if (foundSensitive.size > 0) {
+        setConsoleLogs((prev) => [...prev, `⚠ 注意以下文件需要手动操作更新: ${[...foundSensitive].join(", ")}`]);
+      }
+
+      setNotification({ type: "success", message: "打包完成" });
     } catch (e) {
       setConsoleLogs((prev) => [...prev, `✗ 打包失败: ${e}`]);
+      setNotification({ type: "error", message: `打包失败: ${e}` });
     }
     setIsPackaging(false);
-    setProgressMsg("");
   }
 
   async function handleFileDoubleClick(filePath: string, targetRev?: number) {
@@ -397,7 +421,7 @@ export default function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Enter") return;
       const target = e.target as HTMLElement;
-      if (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
+      if (["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(target.tagName)) return;
       if (showProjectModal || showSettingsModal || diffState) return;
       if (view === "commits" && selectedRevs.size > 0 && !isPackaging) {
         e.preventDefault();
@@ -555,12 +579,6 @@ export default function App() {
                 {currentProject.svn_url}
               </div>
             )}
-            {isPackaging && (
-              <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-red-50 border border-red-200 text-[10px] font-mono text-red-600 max-w-xs dark:bg-red-500/20 dark:border-red-500/30">
-                <Loader2 size={12} className="animate-spin shrink-0" />
-                <span className="truncate">{progressMsg || "打包中..."}</span>
-              </div>
-            )}
             {/* Window Controls */}
             <div className="flex items-center ml-4 tauri-no-drag">
               <button
@@ -592,7 +610,7 @@ export default function App() {
         <div className="flex-1 overflow-hidden flex flex-col">
           {!currentProject ? (
             <div className="flex-1 flex flex-col items-center justify-center text-slate-400 dark:text-graphite-400">
-              <Package size={48} className="mb-4 text-slate-300 dark:text-slate-700" />
+              <Package size={48} className="mb-4 text-slate-300 dark:text-graphite-400" />
               <h2 className="text-sm font-medium text-slate-600 mb-1 dark:text-graphite-200">欢迎使用 SVN Packager</h2>
               <p className="text-xs dark:text-graphite-400">点击左侧"新增项目"按钮开始配置</p>
             </div>
@@ -632,7 +650,7 @@ export default function App() {
                   <button
                     onClick={handleFetchLogs}
                     disabled={isLoading}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs font-medium transition-colors disabled:opacity-50 dark:bg-blue-600/20 dark:hover:bg-blue-600/30 dark:text-blue-400"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium transition-colors disabled:opacity-50 dark:bg-red-500/20 dark:hover:bg-red-500/30 dark:text-red-400"
                   >
                     <RefreshCw size={12} className={isLoading ? "animate-spin" : ""} />
                     获取日志
@@ -673,7 +691,7 @@ export default function App() {
                             className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] transition-colors ${
                               selectedRevs.size === commitRecords.length && commitRecords.length > 0
                                 ? "bg-red-500 border-red-500 text-white"
-                                : "border-slate-300 hover:border-red-400 dark:border-slate-500"
+                                : "border-slate-300 hover:border-red-400 dark:border-graphite-500"
                             }`}
                           >
                             {selectedRevs.size === commitRecords.length && commitRecords.length > 0 && <CheckCircle2 size={10} />}
@@ -698,7 +716,7 @@ export default function App() {
                             className={`border-b border-slate-100 cursor-pointer transition-colors dark:border-graphite-500 ${isSelected ? "bg-red-50/60 dark:bg-red-500/20" : "hover:bg-slate-50 dark:hover:bg-graphite-600/50"}`}
                           >
                             <td className="px-4 py-3">
-                              <div className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] transition-colors ${isSelected ? "bg-red-500 border-red-500 text-white" : "border-slate-300 dark:border-slate-500"}`}>
+                              <div className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] transition-colors ${isSelected ? "bg-red-500 border-red-500 text-white" : "border-slate-300 dark:border-graphite-500"}`}>
                                 {isSelected && <CheckCircle2 size={10} />}
                               </div>
                             </td>
@@ -738,7 +756,7 @@ export default function App() {
                   )}
                   {commitRecords.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-16 text-slate-400 dark:text-graphite-400">
-                      <GitCommit size={32} className="mb-3 text-slate-300 dark:text-slate-700" />
+                      <GitCommit size={32} className="mb-3 text-slate-300 dark:text-graphite-400" />
                       <p className="text-sm text-slate-500 mb-1 dark:text-graphite-300">暂无提交记录</p>
                       <p className="text-xs dark:text-graphite-400">选择日期范围后点击"获取日志"</p>
                     </div>
@@ -840,14 +858,14 @@ export default function App() {
                     </table>
                     {packageFiles.length === 0 && (
                       <div className="flex flex-col items-center justify-center py-16 text-slate-400 dark:text-graphite-400">
-                        <Package size={32} className="mb-3 text-slate-300 dark:text-slate-700" />
+                        <Package size={32} className="mb-3 text-slate-300 dark:text-graphite-400" />
                         <p className="text-sm text-slate-500 mb-1 dark:text-graphite-300">没有待打包文件</p>
                         <p className="text-xs dark:text-graphite-400">请返回选择提交记录</p>
                       </div>
                     )}
                     {packageFiles.length > 0 && filteredPackageFiles.length === 0 && (
                       <div className="flex flex-col items-center justify-center py-16 text-slate-400 dark:text-graphite-400">
-                        <Search size={32} className="mb-3 text-slate-300 dark:text-slate-700" />
+                        <Search size={32} className="mb-3 text-slate-300 dark:text-graphite-400" />
                         <p className="text-sm text-slate-500 mb-1 dark:text-graphite-300">没有匹配的文件</p>
                         <p className="text-xs dark:text-graphite-400">请调整搜索关键词</p>
                       </div>
@@ -872,7 +890,14 @@ export default function App() {
                       清空
                     </button>
                     <button
-                      onClick={() => navigator.clipboard.writeText(consoleLogs.join("\n"))}
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(consoleLogs.join("\n"));
+                          setNotification({ type: "success", message: "已复制到剪贴板" });
+                        } catch {
+                          setNotification({ type: "error", message: "复制失败，请手动复制" });
+                        }
+                      }}
                       className="text-[10px] text-slate-400 hover:text-slate-600 transition-colors dark:hover:text-slate-300"
                     >
                       复制
@@ -894,6 +919,8 @@ export default function App() {
                             ? "text-green-600"
                             : log.startsWith("✗")
                             ? "text-red-600"
+                            : log.startsWith("\u26a0")
+                            ? "text-amber-600"
                             : log.includes("开始")
                             ? "text-red-600"
                             : "text-slate-600 dark:text-graphite-200"
@@ -941,7 +968,7 @@ export default function App() {
 
       {/* Floating Notification Toast */}
       {notification && (
-        <div className="fixed top-4 right-4 z-[60] flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg border text-xs font-medium bg-white/95 backdrop-blur-sm dark:bg-graphite-700/95 dark:border-graphite-500">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg border text-xs font-medium bg-white/95 backdrop-blur-sm dark:bg-graphite-700/95 dark:border-graphite-500">
           <span
             className={`w-1.5 h-1.5 rounded-full ${
               notification.type === "success" ? "bg-green-500" : "bg-red-500"
@@ -977,6 +1004,14 @@ function DiffViewerModal({
   error: string | null;
   onClose: () => void;
 }) {
+  const [copyNotice, setCopyNotice] = useState<"success" | "error" | null>(null);
+  useEffect(() => {
+    if (copyNotice) {
+      const timer = setTimeout(() => setCopyNotice(null), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [copyNotice]);
+
   const hunks = useMemo(() => {
     if (!diffText) return [];
     return parseDiff(diffText);
@@ -1081,8 +1116,26 @@ function DiffViewerModal({
 
   const fileName = filePath.split("/").pop() || filePath;
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      {copyNotice && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg border text-xs font-medium backdrop-blur-sm ${
+          copyNotice === "success"
+            ? "bg-green-50/95 border-green-200 text-green-700 dark:bg-green-500/20 dark:border-green-500/30 dark:text-green-400"
+            : "bg-red-50/95 border-red-200 text-red-700 dark:bg-red-500/20 dark:border-red-500/30 dark:text-red-400"
+        }`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${copyNotice === "success" ? "bg-green-500" : "bg-red-500"}`} />
+          {copyNotice === "success" ? "已复制到剪贴板" : "复制失败"}
+        </div>
+      )}
       <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-[90vw] max-w-[1200px] h-[85vh] flex flex-col overflow-hidden dark:bg-graphite-700 dark:border-graphite-500">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 shrink-0 dark:border-graphite-500">
@@ -1096,7 +1149,14 @@ function DiffViewerModal({
           <div className="flex items-center gap-2 shrink-0">
             {diffText && (
               <button
-                onClick={() => navigator.clipboard.writeText(diffText)}
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(diffText);
+                    setCopyNotice("success");
+                  } catch {
+                    setCopyNotice("error");
+                  }
+                }}
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs text-slate-600 transition-colors dark:bg-graphite-700 dark:hover:bg-graphite-500 dark:border-graphite-500 dark:text-graphite-200"
               >
                 <Copy size={12} /> 复制全部
@@ -1211,7 +1271,7 @@ function DiffViewerModal({
 
               {/* Viewport indicator (draggable handle) */}
               <div
-                className="absolute left-0.5 right-0.5 bg-slate-300/70 rounded-sm border border-slate-400/30 hover:bg-slate-400/70 transition-colors dark:bg-slate-500/70 dark:border-slate-400/30 dark:hover:bg-graphite-500/70"
+                className="absolute left-0.5 right-0.5 bg-slate-300/70 rounded-sm border border-slate-400/30 hover:bg-slate-400/70 transition-colors dark:bg-graphite-400/70 dark:border-graphite-300/30 dark:hover:bg-graphite-500/70"
                 style={{
                   top: `${viewportTop}%`,
                   height: `${Math.max(viewportHeight, 3)}%`,
@@ -1260,7 +1320,7 @@ function DiffViewerModal({
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-sm bg-amber-500" /> 混合
             </span>
-            <span className="text-slate-300">|</span>
+            <span className="text-slate-300 dark:text-graphite-500">|</span>
             <span>{changeRegions.length} 处变更</span>
           </div>
         )}
@@ -1285,6 +1345,14 @@ function ProjectModal({
   );
   const [testStatus, setTestStatus] = useState<"idle" | "loading" | "success" | "fail" | "error">("idle");
   const [testError, setTestError] = useState("");
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   async function testConnection() {
     if (!form.svn_url) return;
@@ -1423,6 +1491,14 @@ function SettingsModal({
   const [form, setForm] = useState(settings);
   const [outputDirError, setOutputDirError] = useState("");
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   function handleSave() {
     if (!form.output_dir.trim()) {
       setOutputDirError("默认输出目录不能为空");
@@ -1465,8 +1541,17 @@ function SettingsModal({
               rows={5}
               value={form.excludes.join("\n")}
               onChange={(e) => setForm({ ...form, excludes: e.target.value.split("\n").filter((s) => s.trim()) })}
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 font-mono focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 font-mono focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 resize-y dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
             />
+          </FormField>
+          <FormField label="打包提醒文件（每行一个）">
+            <textarea
+              rows={5}
+              value={form.sensitive_files.join("\n")}
+              onChange={(e) => setForm({ ...form, sensitive_files: e.target.value.split("\n").filter((s) => s.trim()) })}
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 font-mono focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 resize-y dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
+            />
+            <p className="mt-1 text-[10px] text-slate-400 dark:text-graphite-400">打包时若包含这些文件，会在控制台提醒手动处理</p>
           </FormField>
         </div>
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-100 bg-slate-50/50 dark:bg-graphite-700/50 dark:border-graphite-500">

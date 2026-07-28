@@ -69,6 +69,15 @@
   background: #6d6d68;
 }
 
+/* textarea 调整手柄暗色配色 */
+::-webkit-resizer {
+  background-color: #d1d5db;
+  border-radius: 2px;
+}
+.dark ::-webkit-resizer {
+  background-color: #4a4a46;
+}
+
 /* 日期选择器暗色配色 */
 .dark input[type="date"] {
   color-scheme: dark;
