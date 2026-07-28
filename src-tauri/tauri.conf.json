@@ -19,7 +19,9 @@
 		"minHeight": 550,
 		"resizable": true,
 		"fullscreen": false,
-		"center": true
+		"center": true,
+		"decorations": false,
+		"transparent": true
       }
     ],
     "security": {
@@ -34,7 +36,12 @@
             "shell:allow-open",
             "dialog:allow-open",
             "dialog:allow-save",
-            "dialog:allow-ask"
+            "dialog:allow-ask",
+            "core:window:allow-minimize",
+            "core:window:allow-maximize",
+            "core:window:allow-unmaximize",
+            "core:window:allow-close",
+            "core:window:allow-start-dragging"
           ]
         }
       ]
