@@ -207,6 +207,15 @@ export default function App() {
 
   async function handleSaveProject(project: SvnProject) {
     try {
+      if (!project.name.trim() || !project.svn_url.trim() || !project.local_path.trim() || !project.username.trim() || !project.password.trim()) {
+        setNotification({ type: "error", message: "请填写所有必填项" });
+        return;
+      }
+      const pathExists = await invoke<boolean>("check_dir_exists", { path: project.local_path });
+      if (!pathExists) {
+        setNotification({ type: "error", message: "本地项目路径不存在，请检查路径是否正确" });
+        return;
+      }
       if (projects.find((p) => p.id === project.id)) {
         await invoke("update_project", { project });
         setNotification({ type: "success", message: "项目已更新" });
@@ -1247,7 +1256,7 @@ function ProjectModal({
           </button>
         </div>
         <div className="p-5 space-y-4">
-          <FormField label="项目名称">
+          <FormField label="项目名称" required>
             <input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -1255,7 +1264,7 @@ function ProjectModal({
               className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
             />
           </FormField>
-          <FormField label="SVN 仓库地址">
+          <FormField label="SVN 仓库地址" required>
             <input
               value={form.svn_url}
               onChange={(e) => setForm({ ...form, svn_url: e.target.value })}
@@ -1263,7 +1272,7 @@ function ProjectModal({
               className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
             />
           </FormField>
-          <FormField label="本地项目路径">
+          <FormField label="本地项目路径" required>
             <input
               value={form.local_path}
               onChange={(e) => setForm({ ...form, local_path: e.target.value })}
@@ -1272,20 +1281,20 @@ function ProjectModal({
             />
           </FormField>
           <div className="grid grid-cols-2 gap-3">
-            <FormField label="SVN 用户名">
+            <FormField label="SVN 用户名" required>
               <input
                 value={form.username}
                 onChange={(e) => setForm({ ...form, username: e.target.value })}
-                placeholder="可选"
+                placeholder="请输入用户名"
                 className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
             </FormField>
-            <FormField label="SVN 密码">
+            <FormField label="SVN 密码" required>
               <input
                 type="password"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
-                placeholder="可选"
+                placeholder="请输入密码"
                 className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
             </FormField>
@@ -1323,8 +1332,8 @@ function ProjectModal({
             </button>
             <button
               onClick={testConnection}
-              disabled={testStatus === "loading"}
-              className="px-4 py-2 rounded-lg border border-brand-200 bg-brand-50 text-xs font-medium text-brand-700 hover:bg-brand-100 transition-colors disabled:opacity-50"
+              disabled={testStatus === "loading" || !form.svn_url.trim() || !form.username.trim() || !form.password.trim()}
+              className="px-4 py-2 rounded-lg border border-brand-200 bg-brand-50 text-xs font-medium text-brand-700 hover:bg-brand-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               测试连接
             </button>
