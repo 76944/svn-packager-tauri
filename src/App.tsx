@@ -300,15 +300,74 @@ export default function App() {
     setIsPackaging(true);
     setConsoleLogs((prev) => [...prev, "开始增量打包..."]);
     try {
-      const changedFiles = commitRecords
-        .filter((r) => selectedRevs.has(r.revision))
-        .flatMap((r) => r.changed_paths);
+      const selectedRecords = commitRecords.filter((r) =>
+        selectedRevs.has(r.revision)
+      );
+      const changedFiles = selectedRecords.flatMap((r) => r.changed_paths);
+
+      // 收集提交记录中被删除的 jar 文件（SVN action=D），生成清理命令
+      const deletedJars = selectedRecords
+        .flatMap((r) => r.deleted_paths || [])
+        .filter((p) => p.toLowerCase().endsWith(".jar"));
+
+      // 检测 pom.xml 变更，若有则分析依赖 jar 变化
+      let extraJarFiles: string[] = [];
+      let cleanupCommands: string[] = [];
+      const pomPaths = changedFiles.filter(
+        (p) => p === "pom.xml" || p.endsWith("/pom.xml")
+      );
+      if (pomPaths.length > 0 && selectedRevs.size > 0) {
+        const revs = [...selectedRevs].sort((a, b) => a - b);
+        const fromRev = revs[0] - 1;
+        const toRev = revs[revs.length - 1];
+        setConsoleLogs((prev) => [...prev, `检测到 pom.xml 变更，分析依赖 jar 变化 (r${fromRev + 1}:r${toRev})...`]);
+        try {
+          const result = await invoke<{
+            jars: string[];
+            cleanup_commands: string[];
+            warnings: string[];
+          }>("analyze_pom_jar_changes", {
+            svnUrl: currentProject.svn_url,
+            username: currentProject.username,
+            password: currentProject.password,
+            pomPaths,
+            fromRev,
+            toRev,
+            projectPath: currentProject.local_path,
+            appName: currentProject.name,
+          });
+          extraJarFiles = result.jars;
+          cleanupCommands = result.cleanup_commands;
+          if (result.warnings.length > 0) {
+            for (const w of result.warnings) {
+              setConsoleLogs((prev) => [...prev, `⚠ ${w}`]);
+            }
+          }
+          setConsoleLogs((prev) => [...prev, `依赖分析完成: 待打包 jar ${extraJarFiles.length} 个, 清理命令 ${cleanupCommands.length} 条`]);
+        } catch (e) {
+          setConsoleLogs((prev) => [...prev, `⚠ pom.xml 依赖分析失败，将跳过 jar 增量: ${e}`]);
+        }
+      }
+
+      // 将提交记录中删除的 jar 也加入清理命令（取文件名生成 rm -rf WEB-INF/lib/xxx.jar）
+      for (const jarPath of deletedJars) {
+        const fileName = jarPath.split("/").pop() || jarPath;
+        const cmd = `rm -rf WEB-INF/lib/${fileName}`;
+        if (!cleanupCommands.includes(cmd)) {
+          cleanupCommands.push(cmd);
+        }
+      }
+      if (deletedJars.length > 0) {
+        setConsoleLogs((prev) => [...prev, `检测到 ${deletedJars.length} 个 jar 被删除，已加入清理命令`]);
+      }
 
       const result = await invoke<string>("package_incremental", {
         projectPath: currentProject.local_path,
         outputDir: settings.output_dir,
         appName: currentProject.name,
         changedFiles,
+        extraJarFiles,
+        cleanupCommands,
       });
       setConsoleLogs((prev) => [...prev, `✓ 打包完成: ${result}`]);
 

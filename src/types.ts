@@ -14,6 +14,7 @@ export interface CommitRecord {
   date: string;
   message: string;
   changed_paths: string[];
+  deleted_paths?: string[];
 }
 
 export interface Settings {

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
-use std::io::{self, BufRead, Write};
+use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Mutex;
@@ -41,6 +41,8 @@ pub struct CommitRecord {
     pub date: String,
     pub message: String,
     pub changed_paths: Vec<String>,
+    #[serde(default)]
+    pub deleted_paths: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -242,12 +244,32 @@ impl SvnService {
             let msg_re = Regex::new(r#"<msg>([\s\S]*?)</msg>"#).unwrap();
             // 注意: <path[^>]*> 会错误匹配 <paths> 包装标签 (因为 <path 是 <paths> 的前缀)
             // 改为 <path(?:\s[^>]*)?> 确保 <path 后面是空格(有属性)或直接 > (无属性),不会匹配 <paths>
+            // 同时提取 action 属性 (A=新增, M=修改, D=删除, R=替换)
             let path_re = Regex::new(r#"<path(?:\s[^>]*)?>([\s\S]*?)</path>"#).unwrap();
+            let action_re = Regex::new(r#"\baction="([A-Z])""#).unwrap();
 
             let author = author_re.captures(body).map(|c| c[1].trim().to_string()).unwrap_or_default();
             let date = date_re.captures(body).map(|c| c[1].trim().to_string()).unwrap_or_default();
             let msg = msg_re.captures(body).map(|c| c[1].trim().to_string()).unwrap_or_default();
-            let paths: Vec<String> = path_re.captures_iter(body).map(|c| c[1].trim().to_string()).collect();
+
+            let mut paths: Vec<String> = Vec::new();
+            let mut deleted_paths: Vec<String> = Vec::new();
+            for cap in path_re.captures_iter(body) {
+                let p = cap[1].trim().to_string();
+                if p.is_empty() {
+                    continue;
+                }
+                // 从整个 <path ...> 标签中提取 action 属性
+                let full_tag = cap.get(0).map(|m| m.as_str()).unwrap_or("");
+                let action = action_re
+                    .captures(full_tag)
+                    .map(|c| c[1].to_string())
+                    .unwrap_or_default();
+                if action == "D" {
+                    deleted_paths.push(p.clone());
+                }
+                paths.push(p);
+            }
 
             records.push(CommitRecord {
                 revision: rev,
@@ -255,6 +277,7 @@ impl SvnService {
                 date,
                 message: msg,
                 changed_paths: paths,
+                deleted_paths,
             });
         }
 
@@ -335,6 +358,62 @@ impl SvnService {
 
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
+
+    /// 获取仓库中指定文件在某个版本的内容（svn cat -r rev）。
+    /// `file_path` 为仓库根相对路径（例如 `/trunk/xxx/pom.xml`）。
+    pub async fn get_file_at_rev(
+        url: &str,
+        username: &str,
+        password: &str,
+        file_path: &str,
+        rev: i64,
+    ) -> Result<String, String> {
+        let repo_root = Self::get_repo_root(url, username, password).await?;
+        let full_url = format!("{}{}", repo_root, file_path);
+
+        let mut cmd = new_svn_command();
+        cmd.arg("cat")
+            .arg(&full_url)
+            .arg("-r")
+            .arg(rev.to_string())
+            .arg("--non-interactive")
+            .arg("--trust-server-cert-failures=unknown-ca,cn-mismatch,expired,not-yet-valid,other")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        if !username.is_empty() {
+            cmd.arg("--username").arg(username);
+        }
+        if !password.is_empty() {
+            cmd.arg("--password").arg(password);
+        }
+
+        let output = cmd
+            .output()
+            .await
+            .map_err(|e| format!("执行 svn cat 失败: {}", e))?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("svn cat 错误: {}", stderr));
+        }
+
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    }
+}
+
+// ==================== POM Dependency Models ====================
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct PomDependency {
+    group_id: String,
+    artifact_id: String,
+    version: String,
+}
+
+impl PomDependency {
+    fn key(&self) -> String {
+        format!("{}:{}", self.group_id, self.artifact_id)
+    }
 }
 
 // ==================== Packager Service ====================
@@ -342,11 +421,227 @@ impl SvnService {
 pub struct PackagerService;
 
 impl PackagerService {
+    /// 解析 pom.xml 内容中的所有 <dependency> 块，提取 groupId/artifactId/version。
+    /// 不区分 dependencies 与 dependencyManagement，统一提取；无法解析的变量版本 (${...}) 原样保留。
+    fn parse_pom_dependencies(pom_xml: &str) -> Vec<PomDependency> {
+        let mut deps = Vec::new();
+        let dep_re = regex::Regex::new(r#"<dependency>([\s\S]*?)</dependency>"#).unwrap();
+        let gid_re = regex::Regex::new(r#"<groupId>\s*([^<]+?)\s*</groupId>"#).unwrap();
+        let aid_re = regex::Regex::new(r#"<artifactId>\s*([^<]+?)\s*</artifactId>"#).unwrap();
+        let ver_re = regex::Regex::new(r#"<version>\s*([^<]+?)\s*</version>"#).unwrap();
+
+        for cap in dep_re.captures_iter(pom_xml) {
+            let body = &cap[1];
+            let group_id = gid_re
+                .captures(body)
+                .map(|c| c[1].trim().to_string())
+                .unwrap_or_default();
+            let artifact_id = aid_re
+                .captures(body)
+                .map(|c| c[1].trim().to_string())
+                .unwrap_or_default();
+            let version = ver_re
+                .captures(body)
+                .map(|c| c[1].trim().to_string())
+                .unwrap_or_default();
+            if !artifact_id.is_empty() {
+                deps.push(PomDependency {
+                    group_id,
+                    artifact_id,
+                    version,
+                });
+            }
+        }
+        deps
+    }
+
+    /// 在 WEB-INF/lib 目录中查找匹配依赖的 jar 文件。
+    /// 优先精确匹配 `{artifactId}-{version}.jar`；version 是变量或精确匹配失败时，
+    /// 按 `{artifactId}-` 前缀模糊匹配，多候选时返回修改时间最新的一个。
+    fn find_jar_in_lib(lib_dir: &Path, dep: &PomDependency) -> Option<PathBuf> {
+        if !lib_dir.is_dir() {
+            return None;
+        }
+
+        // 精确匹配
+        if !dep.version.is_empty() && !dep.version.starts_with("${") {
+            let exact_name = format!("{}-{}.jar", dep.artifact_id, dep.version);
+            if let Ok(entries) = fs::read_dir(lib_dir) {
+                for entry in entries.filter_map(|e| e.ok()) {
+                    let path = entry.path();
+                    if path.file_name().and_then(|n| n.to_str()) == Some(&exact_name) {
+                        return Some(path);
+                    }
+                }
+            }
+        }
+
+        // 模糊匹配：{artifactId}-*.jar
+        let prefix = format!("{}-", dep.artifact_id);
+        let mut candidates: Vec<PathBuf> = Vec::new();
+        if let Ok(entries) = fs::read_dir(lib_dir) {
+            for entry in entries.filter_map(|e| e.ok()) {
+                let path = entry.path();
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    if name.starts_with(&prefix) && name.ends_with(".jar") {
+                        candidates.push(path);
+                    }
+                }
+            }
+        }
+
+        // 多候选：按修改时间倒序，取最新
+        candidates.sort_by(|a, b| {
+            let ta = a
+                .metadata()
+                .and_then(|m| m.modified())
+                .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+            let tb = b
+                .metadata()
+                .and_then(|m| m.modified())
+                .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+            tb.cmp(&ta)
+        });
+        candidates.into_iter().next()
+    }
+
+    /// 分析 pom.xml 在 [from_rev, to_rev] 版本范围内的依赖变更，
+    /// 返回需要打包的 jar 文件路径（来自 war 产物 WEB-INF/lib）和需要执行的旧 jar 清理命令。
+    pub async fn analyze_pom_jar_changes(
+        svn_url: &str,
+        username: &str,
+        password: &str,
+        pom_paths: &[String],
+        from_rev: i64,
+        to_rev: i64,
+        project_root: &Path,
+        app_name: &str,
+    ) -> Result<(Vec<PathBuf>, Vec<String>, Vec<String>), String> {
+        let war_dir = Self::find_war_exploded_dir_anywhere(project_root, app_name)
+            .ok_or("未找到编译产物（war展开目录），请先编译项目")?;
+        let lib_dir = war_dir.join("WEB-INF").join("lib");
+
+        let mut jars: Vec<PathBuf> = Vec::new();
+        let mut cleanup_commands: Vec<String> = Vec::new();
+        let mut warnings: Vec<String> = Vec::new();
+
+        for pom_path in pom_paths {
+            // 获取新旧版本 pom.xml 内容（旧版本取 from_rev - 1，即变更前状态）
+            let old_pom = match SvnService::get_file_at_rev(
+                svn_url,
+                username,
+                password,
+                pom_path,
+                from_rev.saturating_sub(1),
+            )
+            .await
+            {
+                Ok(content) => content,
+                Err(e) => {
+                    warnings.push(format!("获取旧版本 {} 失败: {}", pom_path, e));
+                    String::new()
+                }
+            };
+            let new_pom = match SvnService::get_file_at_rev(
+                svn_url,
+                username,
+                password,
+                pom_path,
+                to_rev,
+            )
+            .await
+            {
+                Ok(content) => content,
+                Err(e) => {
+                    warnings.push(format!("获取新版本 {} 失败: {}", pom_path, e));
+                    String::new()
+                }
+            };
+
+            let old_deps = Self::parse_pom_dependencies(&old_pom);
+            let new_deps = Self::parse_pom_dependencies(&new_pom);
+
+            let old_map: HashMap<String, PomDependency> = old_deps
+                .iter()
+                .map(|d| (d.key(), d.clone()))
+                .collect();
+            let new_map: HashMap<String, PomDependency> = new_deps
+                .iter()
+                .map(|d| (d.key(), d.clone()))
+                .collect();
+
+            // 新增的依赖：打包 jar
+            for (key, new_dep) in &new_map {
+                if !old_map.contains_key(key) {
+                    match Self::find_jar_in_lib(&lib_dir, new_dep) {
+                        Some(jar_path) => {
+                            if !jars.contains(&jar_path) {
+                                jars.push(jar_path);
+                            }
+                        }
+                        None => {
+                            warnings.push(format!(
+                                "新增依赖 {}:{}:{} 在 WEB-INF/lib 中未找到 jar",
+                                new_dep.group_id, new_dep.artifact_id, new_dep.version
+                            ));
+                        }
+                    }
+                }
+            }
+
+            // 版本变更的依赖：打包新版本 jar + 生成删除旧版本命令
+            for (key, new_dep) in &new_map {
+                if let Some(old_dep) = old_map.get(key) {
+                    if old_dep.version != new_dep.version {
+                        match Self::find_jar_in_lib(&lib_dir, new_dep) {
+                            Some(jar_path) => {
+                                if !jars.contains(&jar_path) {
+                                    jars.push(jar_path);
+                                }
+                            }
+                            None => {
+                                warnings.push(format!(
+                                    "版本变更依赖 {}:{}:{} 在 WEB-INF/lib 中未找到 jar",
+                                    new_dep.group_id, new_dep.artifact_id, new_dep.version
+                                ));
+                            }
+                        }
+                        // 生成删除旧版本 jar 的命令
+                        if !old_dep.version.is_empty()
+                            && !old_dep.version.starts_with("${")
+                        {
+                            cleanup_commands.push(format!(
+                                "rm -rf WEB-INF/lib/{}-{}.jar",
+                                old_dep.artifact_id, old_dep.version
+                            ));
+                        }
+                    }
+                }
+            }
+
+            // 删除的依赖：生成清理命令
+            for (key, old_dep) in &old_map {
+                if !new_map.contains_key(key) {
+                    if !old_dep.version.is_empty() && !old_dep.version.starts_with("${") {
+                        cleanup_commands.push(format!(
+                            "rm -rf WEB-INF/lib/{}-{}.jar",
+                            old_dep.artifact_id, old_dep.version
+                        ));
+                    }
+                }
+            }
+        }
+
+        Ok((jars, cleanup_commands, warnings))
+    }
+
     pub fn package_incremental(
         project_path: &str,
         output_dir: &str,
         app_name: &str,
         changed_files: &[String],
+        extra_jar_files: &[PathBuf],
+        cleanup_commands: &[String],
         settings: &Settings,
         progress_callback: &dyn Fn(String),
     ) -> Result<String, String> {
@@ -474,12 +769,72 @@ impl PackagerService {
             }
         }
 
+        // 处理 pom.xml 变更引入的额外 jar 包（来自 WEB-INF/lib）
+        if !extra_jar_files.is_empty() {
+            progress_callback(format!("检测到 pom.xml 变更，追加 {} 个依赖 jar", extra_jar_files.len()));
+            for jar_path in extra_jar_files {
+                if !jar_path.is_file() {
+                    progress_callback(format!("  跳过不存在的 jar: {}", jar_path.display()));
+                    continue;
+                }
+                // 优先用相对 war_dir 的路径（WEB-INF/lib/xxx.jar），否则用文件名兜底
+                let entry_name = jar_path
+                    .strip_prefix(&war_dir)
+                    .ok()
+                    .map(|p| p.to_string_lossy().replace('\\', "/"))
+                    .unwrap_or_else(|| {
+                        format!(
+                            "WEB-INF/lib/{}",
+                            jar_path
+                                .file_name()
+                                .and_then(|n| n.to_str())
+                                .unwrap_or("unknown.jar")
+                        )
+                    });
+                if added_entries.insert(entry_name.clone()) {
+                    progress_callback(format!("  添加依赖 jar: {}", entry_name));
+                    zip.start_file(&entry_name, options)
+                        .map_err(|e| e.to_string())?;
+                    let mut f = File::open(jar_path).map_err(|e| e.to_string())?;
+                    io::copy(&mut f, &mut zip).map_err(|e| e.to_string())?;
+                }
+            }
+        }
+
+        // 清理命令直接输出到控制台（不写入打包文件），相同命令去重
+        // 移到打包完成后输出
+        let pending_cleanup_commands: Vec<String> = if !cleanup_commands.is_empty() {
+            let mut seen: HashSet<String> = HashSet::new();
+            let mut unique_cmds: Vec<String> = Vec::new();
+            for cmd in cleanup_commands {
+                if seen.insert(cmd.clone()) {
+                    unique_cmds.push(cmd.clone());
+                }
+            }
+            unique_cmds
+        } else {
+            Vec::new()
+        };
+
         zip.finish().map_err(|e| e.to_string())?;
 
         progress_callback(format!(
             "增量打包完成: {}",
             zip_path.to_string_lossy()
         ));
+
+        // 在打包完成后输出清理命令（用 ⚠ 前缀让前端渲染为注意色）
+        if !pending_cleanup_commands.is_empty() {
+            progress_callback(format!(
+                "⚠ 检测到依赖变更，需要在服务器执行以下 {} 条清理命令（删除旧 jar）：",
+                pending_cleanup_commands.len()
+            ));
+            progress_callback("⚠ # Windows 环境可改用: del /F /Q WEB-INF\\lib\\xxx.jar".to_string());
+            for cmd in &pending_cleanup_commands {
+                progress_callback(format!("⚠   {}", cmd));
+            }
+        }
+
         Ok(zip_path.to_string_lossy().to_string())
     }
 
@@ -1042,6 +1397,49 @@ fn save_settings(state: State<ConfigManager>, settings: Settings) {
     ConfigManager::save_settings(&s);
 }
 
+// ==================== POM Jar Change Result ====================
+
+#[derive(Debug, Clone, Serialize)]
+struct PomJarChangeResult {
+    /// 需要打包的 jar 文件绝对路径（来自 war 产物 WEB-INF/lib）
+    jars: Vec<String>,
+    /// 需要在服务器上执行的旧 jar 删除命令
+    cleanup_commands: Vec<String>,
+    /// 解析过程中的警告信息（变量版本、未找到 jar 等）
+    warnings: Vec<String>,
+}
+
+#[tauri::command]
+async fn analyze_pom_jar_changes(
+    svn_url: String,
+    username: String,
+    password: String,
+    pom_paths: Vec<String>,
+    from_rev: i64,
+    to_rev: i64,
+    project_path: String,
+    app_name: String,
+) -> Result<PomJarChangeResult, String> {
+    let project_root = PathBuf::from(&project_path);
+    let (jars, cleanup_commands, warnings) = PackagerService::analyze_pom_jar_changes(
+        &svn_url,
+        &username,
+        &password,
+        &pom_paths,
+        from_rev,
+        to_rev,
+        &project_root,
+        &app_name,
+    )
+    .await?;
+
+    Ok(PomJarChangeResult {
+        jars: jars.into_iter().map(|p| p.to_string_lossy().to_string()).collect(),
+        cleanup_commands,
+        warnings,
+    })
+}
+
 #[tauri::command]
 fn package_incremental(
     app: AppHandle,
@@ -1050,15 +1448,33 @@ fn package_incremental(
     output_dir: String,
     app_name: String,
     changed_files: Vec<String>,
+    extra_jar_files: Option<Vec<String>>,
+    cleanup_commands: Option<Vec<String>>,
 ) -> Result<String, String> {
     let settings = state.settings.lock().unwrap().clone();
     let app_handle = app.clone();
+
+    // 将前端传入的 jar 绝对路径字符串转为 PathBuf
+    let extra_jars: Vec<PathBuf> = extra_jar_files
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|s| {
+            if s.is_empty() {
+                None
+            } else {
+                Some(PathBuf::from(s))
+            }
+        })
+        .collect();
+    let cleanups = cleanup_commands.unwrap_or_default();
 
     PackagerService::package_incremental(
         &project_path,
         &output_dir,
         &app_name,
         &changed_files,
+        &extra_jars,
+        &cleanups,
         &settings,
         &|msg: String| {
             let _ = app_handle.emit("package_progress", msg);
@@ -1100,6 +1516,7 @@ pub fn run() {
             remove_project,
             get_settings,
             save_settings,
+            analyze_pom_jar_changes,
             package_incremental,
             check_dir_exists,
             open_directory,
