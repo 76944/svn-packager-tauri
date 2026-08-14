@@ -1013,6 +1013,7 @@ export default function App() {
           project={editingProject}
           onSave={handleSaveProject}
           onClose={() => { setShowProjectModal(false); setEditingProject(null); }}
+          setNotification={setNotification}
         />
       )}
 
@@ -1394,16 +1395,18 @@ function ProjectModal({
   project,
   onSave,
   onClose,
+  setNotification,
 }: {
   project: SvnProject | null;
   onSave: (p: SvnProject) => void;
   onClose: () => void;
+  setNotification: (n: { type: "success" | "error"; message: string } | null) => void;
 }) {
   const [form, setForm] = useState<SvnProject>(
     project || { id: generateId(), name: "", svn_url: "", local_path: "", username: "", password: "" }
   );
-  const [testStatus, setTestStatus] = useState<"idle" | "loading" | "success" | "fail" | "error">("idle");
-  const [testError, setTestError] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<"idle" | "success" | "fail">("idle");
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1415,17 +1418,26 @@ function ProjectModal({
 
   async function testConnection() {
     if (!form.svn_url) return;
-    setTestStatus("loading");
+    setTesting(true);
+    setTestResult("idle");
     try {
       const ok = await invoke<boolean>("test_svn_connection", {
         url: form.svn_url,
         username: form.username,
         password: form.password,
       });
-      setTestStatus(ok ? "success" : "fail");
+      if (ok) {
+        setTestResult("success");
+        setNotification({ type: "success", message: "连接成功" });
+      } else {
+        setTestResult("fail");
+        setNotification({ type: "error", message: "连接失败" });
+      }
     } catch (e) {
-      setTestStatus("error");
-      setTestError(String(e));
+      setTestResult("fail");
+      setNotification({ type: "error", message: String(e) });
+    } finally {
+      setTesting(false);
     }
   }
 
@@ -1487,25 +1499,20 @@ function ProjectModal({
           </div>
         </div>
         <div className="flex items-center justify-between gap-2 px-5 py-4 border-t border-slate-100 bg-slate-50/50 dark:bg-graphite-700/50 dark:border-graphite-500">
-          <div className="flex items-center gap-2">
-            {testStatus === "loading" && (
+          <div className="flex items-center gap-2 min-w-[120px]">
+            {testing && (
               <span className="flex items-center gap-1 text-xs text-red-600">
                 <Loader2 size={12} className="animate-spin" /> 正在测试...
               </span>
             )}
-            {testStatus === "success" && (
-              <span className="flex items-center gap-1 text-xs text-green-600 font-medium dark:text-green-400">
+            {!testing && testResult === "success" && (
+              <span className="flex items-center gap-1 px-3 py-1.5 rounded-md border border-green-200 bg-green-50 text-xs text-green-700 font-medium dark:bg-green-500/10 dark:border-green-500/30 dark:text-green-400">
                 <CheckCircle2 size={12} /> 连接成功
               </span>
             )}
-            {testStatus === "fail" && (
-              <span className="flex items-center gap-1 text-xs text-red-600 font-medium dark:text-red-400">
+            {!testing && testResult === "fail" && (
+              <span className="flex items-center gap-1 px-3 py-1.5 rounded-md border border-red-200 bg-red-50 text-xs text-red-700 font-medium dark:bg-red-500/10 dark:border-red-500/30 dark:text-red-400">
                 <X size={12} /> 连接失败
-              </span>
-            )}
-            {testStatus === "error" && (
-              <span className="flex items-center gap-1 text-xs text-red-600 font-medium dark:text-red-400" title={testError}>
-                <X size={12} /> 连接异常
               </span>
             )}
           </div>
@@ -1518,10 +1525,10 @@ function ProjectModal({
             </button>
             <button
               onClick={testConnection}
-              disabled={testStatus === "loading" || !form.svn_url.trim() || !form.username.trim() || !form.password.trim()}
+              disabled={testing || !form.svn_url.trim() || !form.username.trim() || !form.password.trim()}
               className="px-4 py-2 rounded-lg border border-red-200 bg-red-50 text-xs font-medium text-red-500 hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              测试连接
+              {testing ? "测试中..." : "测试连接"}
             </button>
             <button
               onClick={() => onSave(form)}

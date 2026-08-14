@@ -4,7 +4,7 @@ use std::fs::{self, File};
 use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::process::Command;
 use zip::write::SimpleFileOptions;
@@ -14,11 +14,62 @@ use regex::Regex;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
 fn new_svn_command() -> Command {
     let mut cmd = Command::new("svn");
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd.arg("--no-auth-cache");
     cmd
+}
+
+static TRUST_CERT_SUPPORTED: OnceLock<bool> = OnceLock::new();
+static SHOW_ITEM_SUPPORTED: OnceLock<bool> = OnceLock::new();
+
+/// 直接通过 svn help 输出判断参数是否真的支持（而非猜版本号），
+/// 因为有些 SVN 版本号正常却是特殊构建，不识别某些参数。
+fn check_help_contains(subcommand: &str, needle: &str) -> bool {
+    let mut cmd = std::process::Command::new("svn");
+    cmd.arg("help").arg(subcommand);
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    match cmd.output() {
+        Ok(out) => {
+            let s = String::from_utf8_lossy(&out.stdout);
+            s.contains(needle)
+        }
+        Err(_) => false,
+    }
+}
+
+/// 判断当前 svn 是否支持 --trust-server-cert-failures 参数。
+fn trust_cert_supported() -> bool {
+    *TRUST_CERT_SUPPORTED.get_or_init(|| check_help_contains("log", "--trust-server-cert-failures"))
+}
+
+/// 判断当前 svn 是否支持 --show-item 参数。
+fn show_item_supported() -> bool {
+    *SHOW_ITEM_SUPPORTED.get_or_init(|| check_help_contains("info", "--show-item"))
+}
+
+/// 仅当 svn help 确认支持时才添加 --trust-server-cert-failures 参数。
+fn add_trust_cert_arg(cmd: &mut Command) {
+    if trust_cert_supported() {
+        cmd.arg("--trust-server-cert-failures=unknown-ca,cn-mismatch,expired,not-yet-valid,other");
+    }
+}
+
+/// 仅当 svn help 确认支持时才添加 --show-item 参数。
+/// 低版本时返回 false，调用方需要 fallback。
+fn add_show_item_arg(cmd: &mut Command, item: &str) -> bool {
+    if show_item_supported() {
+        cmd.arg("--show-item").arg(item);
+        true
+    } else {
+        false
+    }
 }
 
 // ==================== Models ====================
@@ -169,9 +220,9 @@ impl SvnService {
         cmd.arg("info")
             .arg(url)
             .arg("--non-interactive")
-            .arg("--trust-server-cert-failures=unknown-ca,cn-mismatch,expired,not-yet-valid,other")
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        add_trust_cert_arg(&mut cmd);
 
         if !username.is_empty() {
             cmd.arg("--username").arg(username);
@@ -181,7 +232,22 @@ impl SvnService {
         }
 
         match cmd.output().await {
-            Ok(output) => Ok(output.status.success()),
+            Ok(output) => {
+                if output.status.success() {
+                    Ok(true)
+                } else {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    let msg = if !stderr.trim().is_empty() {
+                        stderr.trim().to_string()
+                    } else if !stdout.trim().is_empty() {
+                        stdout.trim().to_string()
+                    } else {
+                        "未知错误".to_string()
+                    };
+                    Err(msg)
+                }
+            }
             Err(e) => Err(format!("执行 svn 命令失败: {}", e)),
         }
     }
@@ -199,9 +265,9 @@ impl SvnService {
             .arg("-v")
             .arg("--xml")
             .arg("--non-interactive")
-            .arg("--trust-server-cert-failures=unknown-ca,cn-mismatch,expired,not-yet-valid,other")
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        add_trust_cert_arg(&mut cmd);
 
         if !start_date.is_empty() {
             // SVN {DATE} 表示特定时间点，需要扩展为全天范围才能搜到当天日志
@@ -289,12 +355,13 @@ impl SvnService {
         let mut cmd = new_svn_command();
         cmd.arg("info")
             .arg(url)
-            .arg("--show-item")
-            .arg("repos-root-url")
             .arg("--non-interactive")
-            .arg("--trust-server-cert-failures=unknown-ca,cn-mismatch,expired,not-yet-valid,other")
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        add_trust_cert_arg(&mut cmd);
+
+        // SVN >= 1.6 支持 --show-item repos-root-url
+        let use_show_item = add_show_item_arg(&mut cmd, "repos-root-url");
 
         if !username.is_empty() {
             cmd.arg("--username").arg(username);
@@ -308,7 +375,19 @@ impl SvnService {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(format!("svn info 错误: {}", stderr));
         }
-        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if use_show_item {
+            Ok(stdout.trim().to_string())
+        } else {
+            // Fallback: SVN < 1.6 时从 svn info 输出中解析 Repository Root 行
+            for line in stdout.lines() {
+                if let Some(rest) = line.strip_prefix("Repository Root:") {
+                    return Ok(rest.trim().to_string());
+                }
+            }
+            Err("无法从 svn info 输出中解析 Repository Root".to_string())
+        }
     }
 
     /// Get the diff text for a file between two revisions.
@@ -339,9 +418,9 @@ impl SvnService {
             .arg("-x")
             .arg(context_arg)
             .arg("--non-interactive")
-            .arg("--trust-server-cert-failures=unknown-ca,cn-mismatch,expired,not-yet-valid,other")
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        add_trust_cert_arg(&mut cmd);
 
         if !username.is_empty() {
             cmd.arg("--username").arg(username);
@@ -377,9 +456,9 @@ impl SvnService {
             .arg("-r")
             .arg(rev.to_string())
             .arg("--non-interactive")
-            .arg("--trust-server-cert-failures=unknown-ca,cn-mismatch,expired,not-yet-valid,other")
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        add_trust_cert_arg(&mut cmd);
 
         if !username.is_empty() {
             cmd.arg("--username").arg(username);
