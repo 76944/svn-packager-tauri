@@ -96,6 +96,8 @@ function getFileIcon(path: string) {
 
 // ==================== App ====================
 
+const MAX_CONSOLE_LOGS = 2000;
+
 type View = "commits" | "package";
 
 interface DiffState {
@@ -128,6 +130,13 @@ export default function App() {
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
   const consoleRef = useRef<HTMLDivElement>(null);
+  // 控制台日志上限：超出时丢弃最旧条目，避免长时间打包导致 DOM 无限增长拖慢渲染
+  const appendLog = useCallback((msg: string) => {
+    setConsoleLogs((prev) => {
+      const next = [...prev, msg];
+      return next.length > MAX_CONSOLE_LOGS ? next.slice(next.length - MAX_CONSOLE_LOGS) : next;
+    });
+  }, []);
   const [view, setView] = useState<View>("commits");
   const [diffState, setDiffState] = useState<DiffState | null>(null);
 
@@ -145,7 +154,7 @@ export default function App() {
   useEffect(() => {
     const unlisten = listen<string>("package_progress", (event) => {
       if (event.payload.startsWith("处理变更文件:")) return;
-      setConsoleLogs((prev) => [...prev, event.payload]);
+      appendLog(event.payload);
     });
     return () => { unlisten.then((f) => f()); };
   }, []);
@@ -195,9 +204,17 @@ export default function App() {
     }
   }
 
+  // 请求序号：切换项目或重复获取时，防止迟到的旧请求结果污染当前列表
+  const fetchSeqRef = useRef(0);
+
   async function handleFetchLogs() {
     if (!currentProject) return;
+    if (dateStart && dateEnd && dateStart > dateEnd) {
+      setNotification({ type: "error", message: "开始日期不能晚于结束日期" });
+      return;
+    }
     setIsLoading(true);
+    const seq = ++fetchSeqRef.current;
     try {
       const records = await invoke<CommitRecord[]>("get_svn_log", {
         url: currentProject.svn_url,
@@ -206,12 +223,15 @@ export default function App() {
         startDate: dateStart,
         endDate: dateEnd,
       });
+      if (seq !== fetchSeqRef.current) return;
       setCommitRecords(records);
       setSelectedRevs(new Set());
     } catch (e) {
-      setNotification({ type: "error", message: `获取日志失败: ${e}` });
+      if (seq === fetchSeqRef.current) {
+        setNotification({ type: "error", message: `获取日志失败: ${e}` });
+      }
     }
-    setIsLoading(false);
+    if (seq === fetchSeqRef.current) setIsLoading(false);
   }
 
   async function handleSaveProject(project: SvnProject) {
@@ -252,6 +272,7 @@ export default function App() {
       setNotification({ type: "success", message: "项目已删除" });
       await loadProjects();
       if (currentProject?.id === id) {
+        fetchSeqRef.current++;
         setCurrentProject(null);
         setCommitRecords([]);
       }
@@ -277,6 +298,10 @@ export default function App() {
 
   async function handlePackage() {
     if (!currentProject) return;
+    if (packageFiles.length === 0) {
+      setNotification({ type: "error", message: "没有待打包文件，请先选择提交记录" });
+      return;
+    }
 
     // 检查默认输出目录
     if (!settings.output_dir || !settings.output_dir.trim()) {
@@ -298,7 +323,7 @@ export default function App() {
     }
 
     setIsPackaging(true);
-    setConsoleLogs((prev) => [...prev, "开始增量打包..."]);
+    appendLog("开始增量打包...");
     try {
       const selectedRecords = commitRecords.filter((r) =>
         selectedRevs.has(r.revision)
@@ -334,7 +359,7 @@ export default function App() {
         const revs = [...selectedRevs].sort((a, b) => a - b);
         const fromRev = revs[0] - 1;
         const toRev = revs[revs.length - 1];
-        setConsoleLogs((prev) => [...prev, `检测到 pom.xml 变更，分析依赖 jar 变化 (r${fromRev + 1}:r${toRev})...`]);
+        appendLog(`检测到 pom.xml 变更，分析依赖 jar 变化 (r${fromRev + 1}:r${toRev})...`);
         try {
           const result = await invoke<{
             jars: string[];
@@ -354,12 +379,12 @@ export default function App() {
           cleanupCommands = result.cleanup_commands;
           if (result.warnings.length > 0) {
             for (const w of result.warnings) {
-              setConsoleLogs((prev) => [...prev, `⚠ ${w}`]);
+              appendLog(`⚠ ${w}`);
             }
           }
-          setConsoleLogs((prev) => [...prev, `依赖分析完成: 待打包 jar ${extraJarFiles.length} 个, 清理命令 ${cleanupCommands.length} 条`]);
+          appendLog(`依赖分析完成: 待打包 jar ${extraJarFiles.length} 个, 清理命令 ${cleanupCommands.length} 条`);
         } catch (e) {
-          setConsoleLogs((prev) => [...prev, `⚠ pom.xml 依赖分析失败，将跳过 jar 增量: ${e}`]);
+          appendLog(`⚠ pom.xml 依赖分析失败，将跳过 jar 增量: ${e}`);
         }
       }
 
@@ -372,7 +397,7 @@ export default function App() {
         }
       }
       if (deletedJars.length > 0) {
-        setConsoleLogs((prev) => [...prev, `检测到 ${deletedJars.length} 个 jar 被删除，已加入清理命令`]);
+        appendLog(`检测到 ${deletedJars.length} 个 jar 被删除，已加入清理命令`);
       }
 
       const result = await invoke<string>("package_incremental", {
@@ -384,24 +409,24 @@ export default function App() {
         cleanupCommands,
         fileRevDates,
       });
-      setConsoleLogs((prev) => [...prev, `✓ 打包完成: ${result}`]);
+      appendLog(`✓ 打包完成: ${result}`);
 
       const SENSITIVE_FILES = settings.sensitive_files;
       const foundSensitive = new Set<string>();
       for (const fp of changedFiles) {
         const basename = fp.split("/").pop() ?? fp;
-        if (SENSITIVE_FILES.some((sf) => basename === sf || basename.endsWith(sf))) {
+        if (SENSITIVE_FILES.some((sf) => basename === sf)) {
           foundSensitive.add(basename);
         }
       }
       if (foundSensitive.size > 0) {
-        setConsoleLogs((prev) => [...prev, `⚠ 注意以下文件需要手动操作更新: ${[...foundSensitive].join(", ")}`]);
+        appendLog(`⚠ 注意以下文件需要手动操作更新: ${[...foundSensitive].join(", ")}`);
       }
 
       setNotification({ type: "success", message: "打包完成" });
     } catch (e) {
       const errMsg = String(e);
-      setConsoleLogs((prev) => [...prev, `✗ 打包失败: ${errMsg}`]);
+      appendLog(`✗ 打包失败: ${errMsg}`);
       if (errMsg.includes("未在本地编译")) {
         // 产物过期中止：顶部横幅醒目提醒先编译
         setNotification({ type: "error", message: "⛔ 检测到旧编译产物，已停止打包，请先编译项目后再打包" });
@@ -507,14 +532,14 @@ export default function App() {
         e.preventDefault();
         setConsoleLogs([]);
         setView("package");
-      } else if (view === "package" && !isPackaging) {
+      } else if (view === "package" && !isPackaging && packageFiles.length > 0) {
         e.preventDefault();
         handlePackageRef.current();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [view, selectedRevs.size, isPackaging, showProjectModal, showSettingsModal, diffState]);
+  }, [view, selectedRevs.size, isPackaging, showProjectModal, showSettingsModal, diffState, packageFiles.length]);
 
   const handleMinimize = async () => {
     const win = await getCurrentWindow();
@@ -569,6 +594,7 @@ export default function App() {
                 <div
                   key={p.id}
                   onClick={() => {
+                    fetchSeqRef.current++;
                     setCurrentProject(p);
                     setCommitRecords([]);
                     setSelectedRevs(new Set());
@@ -874,7 +900,7 @@ export default function App() {
                     <span className="text-[10px] text-slate-400 dark:text-graphite-400">双击文件查看变更详情</span>
                     <button
                       onClick={handlePackage}
-                      disabled={isPackaging}
+                      disabled={isPackaging || packageFiles.length === 0}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       title="按 Enter 快速打包"
                     >
@@ -1627,7 +1653,7 @@ function SettingsModal({
             <textarea
               rows={5}
               value={form.excludes.join("\n")}
-              onChange={(e) => setForm({ ...form, excludes: e.target.value.split("\n").filter((s) => s.trim()) })}
+              onChange={(e) => setForm({ ...form, excludes: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean) })}
               className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 font-mono focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 dark:focus:ring-accent-500/25 dark:focus:border-accent-500 resize-y dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
             />
           </FormField>
@@ -1635,7 +1661,7 @@ function SettingsModal({
             <textarea
               rows={5}
               value={form.sensitive_files.join("\n")}
-              onChange={(e) => setForm({ ...form, sensitive_files: e.target.value.split("\n").filter((s) => s.trim()) })}
+              onChange={(e) => setForm({ ...form, sensitive_files: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean) })}
               className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 font-mono focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 dark:focus:ring-accent-500/25 dark:focus:border-accent-500 resize-y dark:bg-graphite-700 dark:border-graphite-500 dark:text-graphite-100"
             />
             <p className="mt-1 text-[10px] text-slate-400 dark:text-graphite-400">打包时若包含这些文件，会在控制台提醒手动处理</p>

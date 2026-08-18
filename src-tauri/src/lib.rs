@@ -1,11 +1,12 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
-use std::io::{self, BufRead};
+use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::{Mutex, OnceLock};
-use tauri::{AppHandle, Emitter, Manager, State};
+use std::time::Duration;
+use tauri::{AppHandle, Emitter, State};
 use tokio::process::Command;
 use zip::write::SimpleFileOptions;
 use regex::Regex;
@@ -19,10 +20,42 @@ use std::os::windows::process::CommandExt;
 
 fn new_svn_command() -> Command {
     let mut cmd = Command::new("svn");
+    // 超时丢弃 future 时同步杀掉子进程，避免残留孤儿 svn.exe
+    cmd.kill_on_drop(true);
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
     cmd.arg("--no-auth-cache");
     cmd
+}
+
+/// svn 命令统一超时时长：网络挂起/服务器无响应时避免无限等待
+const SVN_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// 带超时执行 svn 命令，防止前端永久卡在加载状态
+async fn run_svn_with_timeout(cmd: &mut Command) -> Result<std::process::Output, String> {
+    match tokio::time::timeout(SVN_TIMEOUT, cmd.output()).await {
+        Ok(Ok(output)) => Ok(output),
+        Ok(Err(e)) => Err(format!("执行 svn 命令失败: {}", e)),
+        Err(_) => Err(format!("svn 命令执行超时（{} 秒），请检查网络或 SVN 服务器状态", SVN_TIMEOUT.as_secs())),
+    }
+}
+
+/// 解码 svn 命令输出：优先 UTF-8；非法 UTF-8 时回退 GBK
+/// （中文 Windows 下 svn 的报错信息通常为 GBK 编码，直接 lossy 会乱码）
+fn decode_svn_bytes(bytes: &[u8]) -> String {
+    match std::str::from_utf8(bytes) {
+        Ok(s) => s.to_string(),
+        Err(_) => encoding_rs::GBK.decode(bytes).0.into_owned(),
+    }
+}
+
+/// 反转义 XML 预定义实体（&amp; 必须最后替换，避免二次反转义）
+fn unescape_xml(s: &str) -> String {
+    s.replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&amp;", "&")
 }
 
 static TRUST_CERT_SUPPORTED: OnceLock<bool> = OnceLock::new();
@@ -37,7 +70,7 @@ fn check_help_contains(subcommand: &str, needle: &str) -> bool {
     cmd.creation_flags(CREATE_NO_WINDOW);
     match cmd.output() {
         Ok(out) => {
-            let s = String::from_utf8_lossy(&out.stdout);
+            let s = decode_svn_bytes(&out.stdout);
             s.contains(needle)
         }
         Err(_) => false,
@@ -161,24 +194,67 @@ impl ConfigManager {
         Self::config_dir().join("settings.json")
     }
 
+    /// 损坏的配置文件隔离保留（追加时间戳后缀）而非静默丢弃，便于排查与恢复
+    fn quarantine_corrupt(path: &Path) {
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "config".to_string());
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let backup = path.with_file_name(format!("{}.corrupt.{}", name, stamp));
+        let _ = fs::rename(path, backup);
+    }
+
+    /// 先写 .tmp 文件再 rename 原子替换，避免写入中途崩溃导致配置损坏
+    fn write_atomic(path: &Path, content: &str) -> Result<(), String> {
+        let tmp = path.with_extension("tmp");
+        fs::write(&tmp, content)
+            .map_err(|e| format!("写入配置 {} 失败: {}", tmp.display(), e))?;
+        fs::rename(&tmp, path)
+            .map_err(|e| format!("替换配置 {} 失败: {}", path.display(), e))?;
+        Ok(())
+    }
+
+    fn ensure_config_dir() -> Result<(), String> {
+        let dir = Self::config_dir();
+        fs::create_dir_all(&dir)
+            .map_err(|e| format!("创建配置目录 {} 失败: {}", dir.display(), e))
+    }
+
     fn load_projects() -> Vec<SvnProject> {
         let path = Self::projects_file();
         if !path.exists() {
             return vec![];
         }
-        fs::read_to_string(&path)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default()
+        let content = match fs::read_to_string(&path) {
+            Ok(s) => s,
+            Err(_) => {
+                Self::quarantine_corrupt(&path);
+                return vec![];
+            }
+        };
+        match serde_json::from_str::<Vec<SvnProject>>(&content) {
+            Ok(mut projects) => {
+                Self::decrypt_project_passwords(&mut projects);
+                projects
+            }
+            Err(_) => {
+                Self::quarantine_corrupt(&path);
+                vec![]
+            }
+        }
     }
 
-    fn save_projects(projects: &[SvnProject]) {
-        let dir = Self::config_dir();
-        let _ = fs::create_dir_all(&dir);
-        let path = Self::projects_file();
-        if let Ok(json) = serde_json::to_string_pretty(projects) {
-            let _ = fs::write(path, json);
-        }
+    fn save_projects(projects: &[SvnProject]) -> Result<(), String> {
+        Self::ensure_config_dir()?;
+        let mut to_save = projects.to_vec();
+        Self::encrypt_project_passwords(&mut to_save);
+        let json = serde_json::to_string_pretty(&to_save)
+            .map_err(|e| format!("序列化项目配置失败: {}", e))?;
+        Self::write_atomic(&Self::projects_file(), &json)
     }
 
     fn load_settings() -> Settings {
@@ -186,23 +262,143 @@ impl ConfigManager {
         if !path.exists() {
             return Settings::default();
         }
-        let mut s: Settings = fs::read_to_string(&path)
+        let content = match fs::read_to_string(&path) {
+            Ok(s) => s,
+            Err(_) => {
+                Self::quarantine_corrupt(&path);
+                return Settings::default();
+            }
+        };
+        // 判断 sensitive_files 键是否存在：仅缺失（旧版配置）才回填默认值，
+        // 用户显式清空时保留空列表
+        let has_sensitive = serde_json::from_str::<serde_json::Value>(&content)
             .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default();
-        if s.sensitive_files.is_empty() {
+            .and_then(|v| v.get("sensitive_files").map(|_| ()))
+            .is_some();
+        let mut s: Settings = match serde_json::from_str(&content) {
+            Ok(s) => s,
+            Err(_) => {
+                Self::quarantine_corrupt(&path);
+                return Settings::default();
+            }
+        };
+        if !has_sensitive {
             s.sensitive_files = Settings::default().sensitive_files;
         }
         s
     }
 
-    fn save_settings(settings: &Settings) {
-        let dir = Self::config_dir();
-        let _ = fs::create_dir_all(&dir);
-        let path = Self::settings_file();
-        if let Ok(json) = serde_json::to_string_pretty(settings) {
-            let _ = fs::write(path, json);
+    fn save_settings(settings: &Settings) -> Result<(), String> {
+        Self::ensure_config_dir()?;
+        let json = serde_json::to_string_pretty(settings)
+            .map_err(|e| format!("序列化设置失败: {}", e))?;
+        Self::write_atomic(&Self::settings_file(), &json)
+    }
+
+    /// 保存前加密密码（已加密的跳过）；加密失败时保留明文，不影响保存
+    fn encrypt_project_passwords(projects: &mut [SvnProject]) {
+        for p in projects.iter_mut() {
+            if p.password.is_empty() || p.password.starts_with("enc:") {
+                continue;
+            }
+            if let Some(enc) = secret::protect(p.password.as_bytes()) {
+                p.password = format!("enc:{}", to_hex(&enc));
+            }
         }
+    }
+
+    /// 加载后解密密码；解密失败时置空（避免把密文当明文传给 svn）；
+    /// 无前缀的旧版明文原样保留，下次保存时自动迁移为加密格式
+    fn decrypt_project_passwords(projects: &mut [SvnProject]) {
+        for p in projects.iter_mut() {
+            if let Some(hex_str) = p.password.strip_prefix("enc:") {
+                p.password = match from_hex(hex_str).and_then(|bytes| secret::unprotect(&bytes)) {
+                    Some(plain) => String::from_utf8_lossy(&plain).into_owned(),
+                    None => String::new(),
+                };
+            }
+        }
+    }
+}
+
+fn to_hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{:02x}", b)).collect()
+}
+
+fn from_hex(s: &str) -> Option<Vec<u8>> {
+    if s.len() % 2 != 0 {
+        return None;
+    }
+    (0..s.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).ok())
+        .collect()
+}
+
+/// Windows: 用 DPAPI (CryptProtectData) 以当前用户凭据加密密码。
+/// 非 Windows: 无 DPAPI，退化为原样返回（仅开发环境涉及）。
+#[cfg(windows)]
+mod secret {
+    use windows::Win32::Foundation::{HLOCAL, LocalFree};
+    use windows::Win32::Security::Cryptography::{
+        CryptProtectData, CryptUnprotectData, CRYPTPROTECT_UI_FORBIDDEN, CRYPT_INTEGER_BLOB,
+    };
+
+    fn crypt(data: &[u8], protect: bool) -> Option<Vec<u8>> {
+        unsafe {
+            let mut input = data.to_vec();
+            let in_blob = CRYPT_INTEGER_BLOB {
+                cbData: input.len() as u32,
+                pbData: input.as_mut_ptr(),
+            };
+            let mut out_blob = CRYPT_INTEGER_BLOB::default();
+            let result = if protect {
+                CryptProtectData(
+                    &in_blob,
+                    None,
+                    None,
+                    None,
+                    None,
+                    CRYPTPROTECT_UI_FORBIDDEN,
+                    &mut out_blob,
+                )
+            } else {
+                CryptUnprotectData(
+                    &in_blob,
+                    None,
+                    None,
+                    None,
+                    None,
+                    CRYPTPROTECT_UI_FORBIDDEN,
+                    &mut out_blob,
+                )
+            };
+            if result.is_err() {
+                return None;
+            }
+            let out = std::slice::from_raw_parts(out_blob.pbData, out_blob.cbData as usize).to_vec();
+            let _ = LocalFree(HLOCAL(out_blob.pbData as *mut std::ffi::c_void));
+            Some(out)
+        }
+    }
+
+    pub fn protect(plain: &[u8]) -> Option<Vec<u8>> {
+        crypt(plain, true)
+    }
+
+    pub fn unprotect(cipher: &[u8]) -> Option<Vec<u8>> {
+        crypt(cipher, false)
+    }
+}
+
+#[cfg(not(windows))]
+mod secret {
+    pub fn protect(plain: &[u8]) -> Option<Vec<u8>> {
+        Some(plain.to_vec())
+    }
+
+    pub fn unprotect(cipher: &[u8]) -> Option<Vec<u8>> {
+        Some(cipher.to_vec())
     }
 }
 
@@ -231,13 +427,13 @@ impl SvnService {
             cmd.arg("--password").arg(password);
         }
 
-        match cmd.output().await {
+        match run_svn_with_timeout(&mut cmd).await {
             Ok(output) => {
                 if output.status.success() {
                     Ok(true)
                 } else {
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    let stderr = decode_svn_bytes(&output.stderr);
+                    let stdout = decode_svn_bytes(&output.stdout);
                     let msg = if !stderr.trim().is_empty() {
                         stderr.trim().to_string()
                     } else if !stdout.trim().is_empty() {
@@ -269,11 +465,20 @@ impl SvnService {
             .stderr(Stdio::piped());
         add_trust_cert_arg(&mut cmd);
 
-        if !start_date.is_empty() {
-            // SVN {DATE} 表示特定时间点，需要扩展为全天范围才能搜到当天日志
-            let start = format!("{}T00:00:00", start_date);
-            let end = format!("{}T23:59:59", end_date);
-            cmd.arg("-r").arg(format!("{{{}}}:{{{}}}", start, end));
+        if !start_date.is_empty() || !end_date.is_empty() {
+            // SVN {DATE} 表示特定时间点，需要扩展为全天范围才能搜到当天日志；
+            // 缺失的一侧用半开区间（最早时间 / HEAD）
+            let start_part = if start_date.is_empty() {
+                "{1970-01-01T00:00:00}".to_string()
+            } else {
+                format!("{{{}}}", format!("{}T00:00:00", start_date))
+            };
+            let end_part = if end_date.is_empty() {
+                "HEAD".to_string()
+            } else {
+                format!("{{{}}}", format!("{}T23:59:59", end_date))
+            };
+            cmd.arg("-r").arg(format!("{}:{}", start_part, end_part));
         }
         if !username.is_empty() {
             cmd.arg("--username").arg(username);
@@ -282,17 +487,16 @@ impl SvnService {
             cmd.arg("--password").arg(password);
         }
 
-        let output = cmd
-            .output()
+        let output = run_svn_with_timeout(&mut cmd)
             .await
             .map_err(|e| format!("执行 svn log 失败: {}", e))?;
 
         if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stderr = decode_svn_bytes(&output.stderr);
             return Err(format!("svn log 错误: {}", stderr));
         }
 
-        let xml = String::from_utf8_lossy(&output.stdout);
+        let xml = decode_svn_bytes(&output.stdout);
         Self::parse_log_xml(&xml)
     }
 
@@ -314,14 +518,15 @@ impl SvnService {
             let path_re = Regex::new(r#"<path(?:\s[^>]*)?>([\s\S]*?)</path>"#).unwrap();
             let action_re = Regex::new(r#"\baction="([A-Z])""#).unwrap();
 
-            let author = author_re.captures(body).map(|c| c[1].trim().to_string()).unwrap_or_default();
+            // XML 输出中的实体需要反转义，否则作者/说明/路径中的 & < > 等字符会失真
+            let author = author_re.captures(body).map(|c| unescape_xml(c[1].trim())).unwrap_or_default();
             let date = date_re.captures(body).map(|c| c[1].trim().to_string()).unwrap_or_default();
-            let msg = msg_re.captures(body).map(|c| c[1].trim().to_string()).unwrap_or_default();
+            let msg = msg_re.captures(body).map(|c| unescape_xml(c[1].trim())).unwrap_or_default();
 
             let mut paths: Vec<String> = Vec::new();
             let mut deleted_paths: Vec<String> = Vec::new();
             for cap in path_re.captures_iter(body) {
-                let p = cap[1].trim().to_string();
+                let p = unescape_xml(cap[1].trim());
                 if p.is_empty() {
                     continue;
                 }
@@ -370,13 +575,15 @@ impl SvnService {
             cmd.arg("--password").arg(password);
         }
 
-        let output = cmd.output().await.map_err(|e| format!("执行 svn info 失败: {}", e))?;
+        let output = run_svn_with_timeout(&mut cmd)
+            .await
+            .map_err(|e| format!("执行 svn info 失败: {}", e))?;
         if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stderr = decode_svn_bytes(&output.stderr);
             return Err(format!("svn info 错误: {}", stderr));
         }
 
-        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stdout = decode_svn_bytes(&output.stdout);
         if use_show_item {
             Ok(stdout.trim().to_string())
         } else {
@@ -429,13 +636,15 @@ impl SvnService {
             cmd.arg("--password").arg(password);
         }
 
-        let output = cmd.output().await.map_err(|e| format!("执行 svn diff 失败: {}", e))?;
+        let output = run_svn_with_timeout(&mut cmd)
+            .await
+            .map_err(|e| format!("执行 svn diff 失败: {}", e))?;
         if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stderr = decode_svn_bytes(&output.stderr);
             return Err(format!("svn diff 错误: {}", stderr));
         }
 
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        Ok(decode_svn_bytes(&output.stdout))
     }
 
     /// 获取仓库中指定文件在某个版本的内容（svn cat -r rev）。
@@ -467,16 +676,15 @@ impl SvnService {
             cmd.arg("--password").arg(password);
         }
 
-        let output = cmd
-            .output()
+        let output = run_svn_with_timeout(&mut cmd)
             .await
             .map_err(|e| format!("执行 svn cat 失败: {}", e))?;
         if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stderr = decode_svn_bytes(&output.stderr);
             return Err(format!("svn cat 错误: {}", stderr));
         }
 
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        Ok(decode_svn_bytes(&output.stdout))
     }
 }
 
@@ -605,13 +813,14 @@ impl PackagerService {
         let mut warnings: Vec<String> = Vec::new();
 
         for pom_path in pom_paths {
-            // 获取新旧版本 pom.xml 内容（旧版本取 from_rev - 1，即变更前状态）
+            // 获取新旧版本 pom.xml 内容（前端传入的 from_rev 已是首个选中版本的前一版，
+            // 即变更前状态，此处不可再减一，否则会多算一次提交的变更）
             let old_pom = match SvnService::get_file_at_rev(
                 svn_url,
                 username,
                 password,
                 pom_path,
-                from_rev.saturating_sub(1),
+                from_rev,
             )
             .await
             {
@@ -850,6 +1059,21 @@ impl PackagerService {
         fs::create_dir_all(output_dir).map_err(|e| e.to_string())?;
 
         let file = File::create(&zip_path).map_err(|e| e.to_string())?;
+
+        // 清理命令先去重（闭包外声明，供打包完成后输出）
+        let pending_cleanup_commands: Vec<String> = {
+            let mut seen: HashSet<String> = HashSet::new();
+            let mut unique_cmds: Vec<String> = Vec::new();
+            for cmd in cleanup_commands {
+                if seen.insert(cmd.clone()) {
+                    unique_cmds.push(cmd.clone());
+                }
+            }
+            unique_cmds
+        };
+
+        // zip 写入过程包在闭包内：任一步失败时删除半成品 zip，避免残留损坏文件
+        let write_result = (|| -> Result<(), String> {
         let mut zip = zip::ZipWriter::new(file);
         let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
@@ -925,22 +1149,14 @@ impl PackagerService {
             }
         }
 
-        // 清理命令直接输出到控制台（不写入打包文件），相同命令去重
-        // 移到打包完成后输出
-        let pending_cleanup_commands: Vec<String> = if !cleanup_commands.is_empty() {
-            let mut seen: HashSet<String> = HashSet::new();
-            let mut unique_cmds: Vec<String> = Vec::new();
-            for cmd in cleanup_commands {
-                if seen.insert(cmd.clone()) {
-                    unique_cmds.push(cmd.clone());
-                }
-            }
-            unique_cmds
-        } else {
-            Vec::new()
-        };
-
         zip.finish().map_err(|e| e.to_string())?;
+        Ok(())
+        })();
+
+        if let Err(e) = write_result {
+            let _ = fs::remove_file(&zip_path);
+            return Err(e);
+        }
 
         progress_callback(format!(
             "增量打包完成: {}",
@@ -1048,7 +1264,9 @@ impl PackagerService {
             for entry in entries.filter_map(|e| e.ok()) {
                 let path = entry.path();
                 if path.is_dir() {
-                    let name = path.file_name()?.to_string_lossy().to_string();
+                    // 单个异常 entry 取不到文件名时跳过即可，不能终止整个搜索
+                    let Some(name_os) = path.file_name() else { continue; };
+                    let name = name_os.to_string_lossy().to_string();
                     if name.contains(app_name) || name.contains(&normalized) {
                         if path.join("WEB-INF").is_dir() {
                             return Some(path);
@@ -1529,26 +1747,27 @@ fn get_projects(state: State<ConfigManager>) -> Vec<SvnProject> {
 }
 
 #[tauri::command]
-fn add_project(state: State<ConfigManager>, project: SvnProject) {
+fn add_project(state: State<ConfigManager>, project: SvnProject) -> Result<(), String> {
     let mut projects = state.projects.lock().unwrap();
     projects.push(project);
-    ConfigManager::save_projects(&projects);
+    ConfigManager::save_projects(&projects)
 }
 
 #[tauri::command]
-fn update_project(state: State<ConfigManager>, project: SvnProject) {
+fn update_project(state: State<ConfigManager>, project: SvnProject) -> Result<(), String> {
     let mut projects = state.projects.lock().unwrap();
-    if let Some(idx) = projects.iter().position(|p| p.id == project.id) {
-        projects[idx] = project;
-        ConfigManager::save_projects(&projects);
-    }
+    let Some(idx) = projects.iter().position(|p| p.id == project.id) else {
+        return Err("要更新的项目不存在".to_string());
+    };
+    projects[idx] = project;
+    ConfigManager::save_projects(&projects)
 }
 
 #[tauri::command]
-fn remove_project(state: State<ConfigManager>, id: String) {
+fn remove_project(state: State<ConfigManager>, id: String) -> Result<(), String> {
     let mut projects = state.projects.lock().unwrap();
     projects.retain(|p| p.id != id);
-    ConfigManager::save_projects(&projects);
+    ConfigManager::save_projects(&projects)
 }
 
 #[tauri::command]
@@ -1557,10 +1776,10 @@ fn get_settings(state: State<ConfigManager>) -> Settings {
 }
 
 #[tauri::command]
-fn save_settings(state: State<ConfigManager>, settings: Settings) {
+fn save_settings(state: State<ConfigManager>, settings: Settings) -> Result<(), String> {
     let mut s = state.settings.lock().unwrap();
     *s = settings;
-    ConfigManager::save_settings(&s);
+    ConfigManager::save_settings(&s)
 }
 
 // ==================== POM Jar Change Result ====================
@@ -1607,9 +1826,9 @@ async fn analyze_pom_jar_changes(
 }
 
 #[tauri::command]
-fn package_incremental(
+async fn package_incremental(
     app: AppHandle,
-    state: State<ConfigManager>,
+    state: State<'_, ConfigManager>,
     project_path: String,
     output_dir: String,
     app_name: String,
@@ -1619,7 +1838,6 @@ fn package_incremental(
     file_rev_dates: Option<HashMap<String, String>>,
 ) -> Result<String, String> {
     let settings = state.settings.lock().unwrap().clone();
-    let app_handle = app.clone();
 
     // 将前端传入的 jar 绝对路径字符串转为 PathBuf
     let extra_jars: Vec<PathBuf> = extra_jar_files
@@ -1636,19 +1854,25 @@ fn package_incremental(
     let cleanups = cleanup_commands.unwrap_or_default();
     let rev_dates = file_rev_dates.unwrap_or_default();
 
-    PackagerService::package_incremental(
-        &project_path,
-        &output_dir,
-        &app_name,
-        &changed_files,
-        &extra_jars,
-        &cleanups,
-        &rev_dates,
-        &settings,
-        &|msg: String| {
-            let _ = app_handle.emit("package_progress", msg);
-        },
-    )
+    // 放入阻塞线程池执行：重 IO 遍历与 zip 压缩不占用主线程，
+    // 避免 UI 卡顿、进度事件延迟到打包结束才批量到达
+    tauri::async_runtime::spawn_blocking(move || {
+        PackagerService::package_incremental(
+            &project_path,
+            &output_dir,
+            &app_name,
+            &changed_files,
+            &extra_jars,
+            &cleanups,
+            &rev_dates,
+            &settings,
+            &|msg: String| {
+                let _ = app.emit("package_progress", msg);
+            },
+        )
+    })
+    .await
+    .map_err(|e| format!("打包任务被中断: {}", e))?
 }
 
 #[tauri::command]
