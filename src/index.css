@@ -14,7 +14,7 @@
     background-color: #f8fafc;
   }
   .dark body {
-    background-color: #161618;
+    background-color: #101014; /* graphite-800 冷蓝灰页面底 */
   }
 }
 
@@ -34,10 +34,10 @@
     background: #9ca3af;
   }
   .dark .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: #4a4a46;
+    background: #34343f;
   }
   .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: #6d6d68;
+    background: #464653;
   }
   .tauri-drag-region {
     -webkit-app-region: drag;
@@ -63,10 +63,10 @@
   background: #9ca3af;
 }
 .dark ::-webkit-scrollbar-thumb {
-  background: #4a4a46;
+  background: #34343f;
 }
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: #6d6d68;
+  background: #464653;
 }
 
 /* textarea 调整手柄暗色配色 */
@@ -75,7 +75,7 @@
   border-radius: 2px;
 }
 .dark ::-webkit-resizer {
-  background-color: #4a4a46;
+  background-color: #34343f;
 }
 
 /* 日期选择器暗色配色 */
