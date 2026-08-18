@@ -5,17 +5,17 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Graphite cool-gray dark surface scale（冷蓝灰主题）
+        // Graphite pure-neutral dark surface scale（纯净中性灰主题）
         graphite: {
-          50: "#f4f4f8",
-          100: "#e8e8ed",
-          200: "#c6c6ce",
-          300: "#a8a8b3",
-          400: "#6e6e7a",
-          500: "#2b2b35", // border
-          600: "#1f1f26", // input / hover
-          700: "#18181d", // card / sidebar
-          800: "#101014", // page bg
+          50: "#f5f5f7",
+          100: "#ededee",
+          200: "#c8c8cc",
+          300: "#a6a6aa",
+          400: "#66666b",
+          500: "#2c2c2f", // border
+          600: "#1f1f21", // input / hover
+          700: "#171718", // card / sidebar
+          800: "#0c0c0d", // page bg
         },
         // 夜间主题强调色——珊瑚红（亮色主题仍用 red-*）
         accent: {
