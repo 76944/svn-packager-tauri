@@ -303,7 +303,21 @@ export default function App() {
       const selectedRecords = commitRecords.filter((r) =>
         selectedRevs.has(r.revision)
       );
-      const changedFiles = selectedRecords.flatMap((r) => r.changed_paths);
+      // 排除删除（D）文件：它们映射不到产物，且不应触发缺失校验误报
+      const deletedPaths = new Set(
+        selectedRecords.flatMap((r) => r.deleted_paths || [])
+      );
+      const changedFiles = selectedRecords
+        .flatMap((r) => r.changed_paths)
+        .filter((p) => !deletedPaths.has(p));
+
+      // 文件 → 最后修改版本日期（用于后端产物新鲜度校验）
+      const fileRevDates: Record<string, string> = {};
+      for (const f of packageFiles) {
+        const lastRev = f.revisions[f.revisions.length - 1];
+        const rec = commitRecords.find((r) => r.revision === lastRev);
+        if (rec) fileRevDates[f.path] = rec.date;
+      }
 
       // 收集提交记录中被删除的 jar 文件（SVN action=D），生成清理命令
       const deletedJars = selectedRecords
@@ -368,6 +382,7 @@ export default function App() {
         changedFiles,
         extraJarFiles,
         cleanupCommands,
+        fileRevDates,
       });
       setConsoleLogs((prev) => [...prev, `✓ 打包完成: ${result}`]);
 
@@ -385,8 +400,14 @@ export default function App() {
 
       setNotification({ type: "success", message: "打包完成" });
     } catch (e) {
-      setConsoleLogs((prev) => [...prev, `✗ 打包失败: ${e}`]);
-      setNotification({ type: "error", message: `打包失败: ${e}` });
+      const errMsg = String(e);
+      setConsoleLogs((prev) => [...prev, `✗ 打包失败: ${errMsg}`]);
+      if (errMsg.includes("未在本地编译")) {
+        // 产物过期中止：顶部横幅醒目提醒先编译
+        setNotification({ type: "error", message: "⛔ 检测到旧编译产物，已停止打包，请先编译项目后再打包" });
+      } else {
+        setNotification({ type: "error", message: `打包失败: ${errMsg}` });
+      }
     }
     setIsPackaging(false);
   }

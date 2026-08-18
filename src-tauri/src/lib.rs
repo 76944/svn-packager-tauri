@@ -721,6 +721,7 @@ impl PackagerService {
         changed_files: &[String],
         extra_jar_files: &[PathBuf],
         cleanup_commands: &[String],
+        file_rev_dates: &HashMap<String, String>,
         settings: &Settings,
         progress_callback: &dyn Fn(String),
     ) -> Result<String, String> {
@@ -742,6 +743,8 @@ impl PackagerService {
         progress_callback("筛选变更文件...".to_string());
         let excluded_files: HashSet<String> = settings.excludes.iter().cloned().collect();
         let mut files_to_package: Vec<PathBuf> = Vec::new();
+        // 收集产物比 SVN 提交旧（未重新编译）的文件，用于打包前中止
+        let mut stale_files: Vec<String> = Vec::new();
 
         for changed_file in changed_files {
             progress_callback(format!("处理变更文件: {}", changed_file));
@@ -753,11 +756,36 @@ impl PackagerService {
                 progress_callback(format!("  跳过排除文件: {}", file_name));
                 continue;
             }
-            let resolved =
-                Self::map_source_path_to_war_output(changed_file, &project_root, &war_dir, &web_inf_classes);
+            let resolved = Self::map_source_path_to_war_output(
+                changed_file,
+                &project_root,
+                &war_dir,
+                &web_inf_classes,
+                progress_callback,
+            );
             progress_callback(format!("  映射到 {} 个候选路径", resolved.len()));
+            // 缺失文件兜底校验：.java 源文件映射不到任何产物时给出显式警告
+            // （D 删除的文件由前端从 changed_files 中过滤，不会走到这里误报）
+            if resolved.is_empty() && changed_file.ends_with(".java") {
+                progress_callback(format!(
+                    "⚠ 未找到 {} 对应的 .class 产物，可能未编译或路径映射失败",
+                    changed_file
+                ));
+            }
             for p in &resolved {
                 progress_callback(format!("    候选: {} (存在: {})", p.to_string_lossy(), p.exists()));
+                // 产物与版本一致性校验：只对 .class 产物比对本地编译时间 vs SVN 提交时间，
+                // 资源文件/文本跳过，避免误报
+                if p.exists()
+                    && p.extension().and_then(|e| e.to_str()) == Some("class")
+                    && !excluded_files.contains(
+                        p.file_name().and_then(|n| n.to_str()).unwrap_or(""),
+                    )
+                {
+                    if let Some(date_str) = file_rev_dates.get(changed_file) {
+                        Self::check_artifact_freshness(p, date_str, changed_file, &mut stale_files, progress_callback);
+                    }
+                }
             }
             for p in resolved {
                 if p.exists()
@@ -796,6 +824,23 @@ impl PackagerService {
         if files_to_package.is_empty() {
             progress_callback("没有找到需要打包的变更文件".to_string());
             return Err("没有找到需要打包的变更文件".to_string());
+        }
+
+        // 产物与版本一致性中止：存在比 SVN 提交旧的产物时停止打包，提醒先编译
+        if !stale_files.is_empty() {
+            progress_callback(format!(
+                "⛔ 检测到 {} 个文件未在本地编译（产物比 SVN 提交旧），停止打包",
+                stale_files.len()
+            ));
+            for f in &stale_files {
+                progress_callback(format!("  - {}", f));
+            }
+            progress_callback("⛔ 请先编译项目，再重新打包".to_string());
+            return Err(format!(
+                "检测到 {} 个文件未在本地编译，已停止打包。请先编译项目后再打包。\n{}",
+                stale_files.len(),
+                stale_files.join("\n")
+            ));
         }
 
         let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
@@ -917,6 +962,47 @@ impl PackagerService {
         Ok(zip_path.to_string_lossy().to_string())
     }
 
+    /// 产物与版本一致性校验：比对本地 .class 产物的修改时间与 SVN 提交时间。
+    /// 产物 mtime 早于 SVN 提交时间 → 说明本地未编译最新代码，加入 stale_files 列表
+    /// 并由调用方决定是否中止打包（避免把旧代码打进增量包）。
+    fn check_artifact_freshness(
+        artifact: &Path,
+        svn_date_str: &str,
+        svn_path: &str,
+        stale_files: &mut Vec<String>,
+        progress_callback: &dyn Fn(String),
+    ) {
+        // SVN 日期为 ISO 8601（如 2026-08-17T03:22:44.123456Z），转本地时间后再比
+        let svn_time = match chrono::DateTime::parse_from_rfc3339(svn_date_str) {
+            Ok(dt) => dt.with_timezone(&chrono::Local).naive_local(),
+            Err(_) => return, // 日期解析失败则跳过，避免误报
+        };
+        let mtime = match fs::metadata(artifact).and_then(|m| m.modified()) {
+            Ok(t) => {
+                let dt: chrono::DateTime<chrono::Local> = t.into();
+                dt.naive_local()
+            }
+            Err(_) => return,
+        };
+        if mtime < svn_time {
+            let detail = format!(
+                "{} (产物编译时间 {} 早于 SVN 提交时间 {})",
+                svn_path,
+                mtime.format("%Y-%m-%d %H:%M:%S"),
+                svn_time.format("%Y-%m-%d %H:%M:%S")
+            );
+            if !stale_files.contains(&detail) {
+                stale_files.push(detail.clone());
+            }
+            progress_callback(format!(
+                "⚠ 产物较旧: {} 的本地编译时间 {} 早于 SVN 提交时间 {}, 可能打包到旧代码",
+                svn_path,
+                mtime.format("%Y-%m-%d %H:%M:%S"),
+                svn_time.format("%Y-%m-%d %H:%M:%S")
+            ));
+        }
+    }
+
     fn find_war_exploded_dir_anywhere(project_root: &Path, app_name: &str) -> Option<PathBuf> {
         let candidates = [
             project_root.join("target"),
@@ -1014,6 +1100,7 @@ impl PackagerService {
         project_root: &Path,
         war_dir: &Path,
         web_inf_classes: &Path,
+        progress_callback: &dyn Fn(String),
     ) -> Vec<PathBuf> {
         let mut results = Vec::new();
         let local_path = Self::to_local_path(svn_path);
@@ -1048,7 +1135,7 @@ impl PackagerService {
                         // The SVN path may include a project prefix (e.g. entss/src/main/java/...)
                         // but the local checkout root may or may not include that prefix.
                         if let Some(java_file) = Self::find_java_source(project_root, class_base) {
-                            eprintln!("[SVN Packager] Found Java source: {}", java_file.display());
+                            progress_callback(format!("  找到 Java 源文件: {}", java_file.display()));
                             for cn in Self::extract_class_names(&java_file) {
                                 if cn == simple_name {
                                     continue; // Main class already added above
@@ -1061,7 +1148,7 @@ impl PackagerService {
                                 Self::collect_inner_classes(parent_dir, &cn, &mut results);
                             }
                         } else {
-                            eprintln!("[SVN Packager] WARNING: Java source not found for class_base='{}' under project_root='{}'", class_base, project_root.display());
+                            progress_callback(format!("⚠ 未找到 Java 源文件: class_base='{}' under project_root='{}'", class_base, project_root.display()));
                         }
                     }
                 }
@@ -1139,7 +1226,7 @@ impl PackagerService {
                         // Sibling top-level classes declared in the same .java file.
                         // Use find_java_source to handle various project layouts and SVN path prefixes.
                         if let Some(java_file) = Self::find_java_source(project_root, class_base) {
-                            eprintln!("[SVN Packager] Found Java source: {}", java_file.display());
+                            progress_callback(format!("  找到 Java 源文件: {}", java_file.display()));
                             for cn in Self::extract_class_names(&java_file) {
                                 if cn == simple_name {
                                     continue; // Main class already added above
@@ -1152,7 +1239,7 @@ impl PackagerService {
                                 Self::collect_inner_classes(parent_dir, &cn, &mut results);
                             }
                         } else {
-                            eprintln!("[SVN Packager] WARNING: Java source not found for class_base='{}' under project_root='{}'", class_base, project_root.display());
+                            progress_callback(format!("⚠ 未找到 Java 源文件: class_base='{}' under project_root='{}'", class_base, project_root.display()));
                         }
                     }
                 }
@@ -1208,7 +1295,7 @@ impl PackagerService {
                         });
                     if let Some(cb) = class_base {
                         if let Some(java_file) = Self::find_java_source(project_root, &cb) {
-                            eprintln!("[SVN Packager] Found Java source (fallback): {}", java_file.display());
+                            progress_callback(format!("  找到 Java 源文件 (fallback): {}", java_file.display()));
                             for cn in Self::extract_class_names(&java_file) {
                                 if cn == base_name {
                                     continue;
@@ -1220,7 +1307,7 @@ impl PackagerService {
                                 Self::collect_inner_classes(&parent_dir, &cn, &mut results);
                             }
                         } else {
-                            eprintln!("[SVN Packager] WARNING: Java source not found (fallback) for class_base='{}' under project_root='{}'", cb, project_root.display());
+                            progress_callback(format!("⚠ 未找到 Java 源文件 (fallback): class_base='{}' under project_root='{}'", cb, project_root.display()));
                         }
                     }
                 }
@@ -1529,6 +1616,7 @@ fn package_incremental(
     changed_files: Vec<String>,
     extra_jar_files: Option<Vec<String>>,
     cleanup_commands: Option<Vec<String>>,
+    file_rev_dates: Option<HashMap<String, String>>,
 ) -> Result<String, String> {
     let settings = state.settings.lock().unwrap().clone();
     let app_handle = app.clone();
@@ -1546,6 +1634,7 @@ fn package_incremental(
         })
         .collect();
     let cleanups = cleanup_commands.unwrap_or_default();
+    let rev_dates = file_rev_dates.unwrap_or_default();
 
     PackagerService::package_incremental(
         &project_path,
@@ -1554,6 +1643,7 @@ fn package_incremental(
         &changed_files,
         &extra_jars,
         &cleanups,
+        &rev_dates,
         &settings,
         &|msg: String| {
             let _ = app_handle.emit("package_progress", msg);
